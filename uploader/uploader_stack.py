@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_sqs as sqs,
     aws_s3 as s3,
+    aws_s3_notifications as s3n,
     aws_sns as sns,
     aws_lambda as _lambda,
     aws_events as events
@@ -17,11 +18,11 @@ class UploaderStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         outgoing_bucket_param = CfnParameter(self,
-                "OutgoingBucketParam", type="String",
+                "OutgoingBucket", type="String",
                 description="Bucket for data to be submitted to the API")
 
         permissions_boundary_policy_param = CfnParameter(self,
-                "PermissionsBoundaryPolicyParam", type="String",
+                "PermissionsBoundaryPolicy", type="String",
                 description="(optional) Policy to be added as permissions boundary to all IAM roles")
 
 
@@ -30,7 +31,7 @@ class UploaderStack(Stack):
         permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, 'PermissionBoundaryLambda', "T_PROJADMIN_U")
         iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
-        outgoing_bucket = s3.Bucket.from_bucket_name(self, "OutgoingBucket",
+        outgoing_bucket = s3.Bucket.from_bucket_name(self, "Outgoing",
                 outgoing_bucket_param.value_as_string )
 
         # topic
@@ -60,7 +61,11 @@ class UploaderStack(Stack):
                 resources=[new_object_topic.topic_arn]))
 
         # https://constructs.dev/packages/@aws-cdk/aws-s3/v/1.139.0?lang=python
-        # bucket.add_event_notification(s3.EventType.OBJECT_CREATED, s3n.LambdaDestination(my_lambda), prefix="home/myusername/*")
+
+        # outgoing_bucket.add_event_notification(
+        #     s3.EventType.OBJECT_CREATED,
+        #     s3n.SnsDestination(new_object_topic),
+        #     s3.NotificationKeyFilter(prefix="processed/*"))
 
         # role(s) for lambdas?
 
@@ -78,7 +83,7 @@ class UploaderStack(Stack):
             "InvokeApiRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name('AWSLambdaBasicExecutionRole')
+                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole')
             ],
             inline_policies=[
                 iam.PolicyDocument(
