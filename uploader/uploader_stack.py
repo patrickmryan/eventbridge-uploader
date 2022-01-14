@@ -16,21 +16,22 @@ class UploaderStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        outgoing_bucket = CfnParameter(self,
-                "OutgoingBucket", type="String",
+        outgoing_bucket_param = CfnParameter(self,
+                "OutgoingBucketParam", type="String",
                 description="Bucket for data to be submitted to the API")
 
-        permissions_boundary_policy = CfnParameter(self,
-                "PermissionsBoundaryPolicy", type="String",
+        permissions_boundary_policy_param = CfnParameter(self,
+                "PermissionsBoundaryPolicyParam", type="String",
                 description="(optional) Policy to be added as permissions boundary to all IAM roles")
 
 
         # need to make boundary policy an optional parameter. update role definitions accordingly.
+        # create a conditional object
         permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, 'PermissionBoundaryLambda', "T_PROJADMIN_U")
         iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
-
-        runtime = _lambda.Runtime.PYTHON_3_8
+        outgoing_bucket = s3.Bucket.from_bucket_name(self, "OutgoingBucket",
+                outgoing_bucket_param.value_as_string )
 
         # topic
 
@@ -58,6 +59,8 @@ class UploaderStack(Stack):
                 ],
                 resources=[new_object_topic.topic_arn]))
 
+        # https://constructs.dev/packages/@aws-cdk/aws-s3/v/1.139.0?lang=python
+        # bucket.add_event_notification(s3.EventType.OBJECT_CREATED, s3n.LambdaDestination(my_lambda), prefix="home/myusername/*")
 
         # role(s) for lambdas?
 
@@ -67,7 +70,26 @@ class UploaderStack(Stack):
         # lambdas
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html
 
+        runtime = _lambda.Runtime.PYTHON_3_8
+
         # invoke_api
+
+        service_role = iam.Role(self,
+            "InvokeApiRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name('AWSLambdaBasicExecutionRole')
+            ],
+            inline_policies=[
+                iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["s3:GetObject"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[outgoing_bucket.bucket_arn])
+                    ]
+                )
+            ])
 
         invoke_api_lambda = _lambda.Function(
                 self, 'InvokeApi',
@@ -80,7 +102,7 @@ class UploaderStack(Stack):
                 timeout=Duration.seconds(60),
                 # memory_size
                 # layers = [ pandas_layer ]
-                # role=lambda_role
+                role=service_role
             )
 
 
