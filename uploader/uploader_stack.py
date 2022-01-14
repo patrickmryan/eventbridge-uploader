@@ -34,6 +34,7 @@ class UploaderStack(Stack):
         # SNS for status
 
         # role(s) for lambdas?
+        # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html
 
         # normal lambda permissions, eventbridge actions, s3 read,write,list, SNS, SQS
 
@@ -48,6 +49,8 @@ class UploaderStack(Stack):
                 environment= {
                     # 'CREDENTIAL' : udl_credential.value_as_string
                 },
+                timeout=Duration.seconds(60),
+                # memory_size
                 # layers = [ pandas_layer ]
                 # role=lambda_role
             )
