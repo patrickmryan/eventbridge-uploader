@@ -11,9 +11,11 @@ def lambda_handler(event, context):
     # for testing, copy the object to another s3 bucket
     # print(json.dumps(event))
 
+    # dynamo resource
+
+
     s3 = boto3.resource('s3')
     event_client = boto3.client('events')
-    # arn:aws:lambda:us-east-1:458358814065:function:UploaderStack-InvokeApi313C8B49-vesKaS0k2oYp
     lambda_arn = context.invoked_function_arn
 
     for sns_record in event.get('Records', []):
@@ -24,22 +26,30 @@ def lambda_handler(event, context):
 
             s3_info = s3_record['s3']
             s3_object = s3.Object(s3_info['bucket']['name'], s3_info['object']['key'])
-            s3_arn = 'arn:aws:s3:::' + s3_object.bucket_name + '/' + s3_object.key
-            # print(s3_object)
+            # be careful of hardcoded partition
+            # s3_arn = 'arn:aws:s3:::' + s3_object.bucket_name + '/' + s3_object.key
+
+            # look up this object in the dynamo cache. if found, continue to next iteration
 
             # do the API thing
+
+            #  copy to some other bucket
+
             # determine success, fatal error, or transient failure
 
             detail = {
-                "status" : "success"
+                "s3Bucket" : s3_object.bucket_name,
+                "status" : [ "succeeded" ]
+            }
+            status_event = {
+                "DetailType" : "API Status",
+                'Source' : lambda_arn,
+                "Detail" : json.dumps(detail)
             }
 
-            status_event = {
-                'Source' : "",
-                'Resources' : [ lambda_arn, s3_arn ],
-                # "DetailType" :
-                "Detail" : detail   #json.dumps(detail)
-            }
+            # if success, write the key in dynamo
+            #  some combination of bucket name, object key, etag
+            #  md5, uuid modules
 
             try:
                 print('sending event')
