@@ -1,10 +1,6 @@
 import os
 import json
 import boto3
-# from urllib.parse import urlencode
-# import urllib3, ssl
-
-
 
 def lambda_handler(event, context):
 
@@ -21,7 +17,5 @@ def lambda_handler(event, context):
         print(exc)
 
     print(json.dumps(response))
-
-    # put it in a Q
 
     return { "status" : "failed" }

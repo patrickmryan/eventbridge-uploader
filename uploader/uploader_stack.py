@@ -1,7 +1,7 @@
 from aws_cdk import (
     Duration,
     Stack,
-    CfnParameter, CfnCondition, Fn,
+    CfnParameter, # CfnCondition, Fn,
     aws_iam as iam,
     aws_logs as logs,
     aws_sqs as sqs,
@@ -28,14 +28,13 @@ class UploaderStack(Stack):
 
         if permissions_boundary_policy_param:
             permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self,
-                'RequiredPermissionBoundary', permissions_boundary_policy_param)
-
+                'PermissionsBoundary', permissions_boundary_policy_param)
             iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
         outgoing_bucket = s3.Bucket.from_bucket_name(self, "Outgoing",
                 outgoing_bucket_param.value_as_string )
 
-        # SNS for status
+        # SNS for notification of new objects
         new_object_topic = sns.Topic(self, "NewObjectTopic")
         topic_policy = sns.TopicPolicy(self,
                     "NewObjectTopicPolicy",
@@ -69,7 +68,8 @@ class UploaderStack(Stack):
         service_role = iam.Role(self,
             "CallApiRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[ iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
@@ -105,7 +105,8 @@ class UploaderStack(Stack):
         service_role = iam.Role(self,
             "ApiSucceededRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[ iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
@@ -144,15 +145,15 @@ class UploaderStack(Stack):
         # create a Q for retrying failed calls
         retry_queue = sqs.Queue(
             self, "RetryQueue",
-            retention_period=Duration.days(2),   #seconds(86400),
-            visibility_timeout=Duration.seconds(60),
-        )
+            retention_period=Duration.days(2),
+            visibility_timeout=Duration.seconds(60))
 
         # role and function for the "failed" case
         service_role = iam.Role(self,
             "ApiFailedRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[ iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
@@ -185,3 +186,31 @@ class UploaderStack(Stack):
                         "status" : [ "failed" ]
                     }),
                 targets = [ targets.LambdaFunction(api_failed_lambda) ])
+
+        # handle retries
+        service_role = iam.Role(self,
+            "HandleRetriesRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            inline_policies=[
+                iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["sqs:SendMessage", "sqs:ReceiveMessage"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[retry_queue.queue_arn]) ] ) ])
+
+        handle_retries_lambda = _lambda.Function(
+                self, 'HandleRetries',
+                runtime=runtime,
+                code=_lambda.Code.from_asset('handle_retries'),
+                handler='handle_retries.lambda_handler',
+                environment= {
+                    'QUEUE_URL' : retry_queue.queue_url
+                },
+                timeout=Duration.seconds(60),
+                role=service_role,
+                log_retention=log_retention)
+
+        # rule to run handle_retries onc per minute
