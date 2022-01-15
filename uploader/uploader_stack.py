@@ -7,6 +7,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_s3_notifications as s3n,
     aws_sns as sns,
+    aws_sns_subscriptions as sns_subscriptions,
     aws_lambda as _lambda,
     aws_events as events
 )
@@ -34,16 +35,13 @@ class UploaderStack(Stack):
         outgoing_bucket = s3.Bucket.from_bucket_name(self, "Outgoing",
                 outgoing_bucket_param.value_as_string )
 
-        # topic
-
         # buckets
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_s3/Bucket.html
 
-
-        retry_queue = sqs.Queue(
-            self, "RetryQueue",
-            visibility_timeout=Duration.seconds(60),
-        )
+        # retry_queue = sqs.Queue(
+        #     self, "RetryQueue",
+        #     visibility_timeout=Duration.seconds(60),
+        # )
 
         # SNS for status
         new_object_topic = sns.Topic(self,
@@ -54,18 +52,15 @@ class UploaderStack(Stack):
         topic_policy.document.add_statements(
                 iam.PolicyStatement(
                 actions=["sns:Subscribe"],
-                principals=[
-                    iam.ServicePrincipal("s3.amazonaws.com")
-                    # iam.AnyPrincipal()
-                ],
+                principals=[ iam.ServicePrincipal("s3.amazonaws.com") ],
                 resources=[new_object_topic.topic_arn]))
 
         # https://constructs.dev/packages/@aws-cdk/aws-s3/v/1.139.0?lang=python
 
-        # outgoing_bucket.add_event_notification(
-        #     s3.EventType.OBJECT_CREATED,
-        #     s3n.SnsDestination(new_object_topic),
-        #     s3.NotificationKeyFilter(prefix="processed/*"))
+        outgoing_bucket.add_event_notification(
+            s3.EventType.OBJECT_CREATED,
+            s3n.SnsDestination(new_object_topic),
+            s3.NotificationKeyFilter(prefix="processed/") )
 
         # role(s) for lambdas?
 
@@ -110,7 +105,7 @@ class UploaderStack(Stack):
                 role=service_role
             )
 
-
-
+        # subscribe the lambda to the topic
+        new_object_topic.add_subscription(sns_subscriptions.LambdaSubscription(invoke_api_lambda))
 
         # event subscriptions
