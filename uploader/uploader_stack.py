@@ -1,7 +1,7 @@
 from aws_cdk import (
     Duration,
     Stack,
-    CfnParameter,
+    CfnParameter, CfnCondition, Fn,
     aws_iam as iam,
     aws_logs as logs,
     aws_sqs as sqs,
@@ -24,22 +24,16 @@ class UploaderStack(Stack):
                 "OutgoingBucket", type="String",
                 description="Bucket for data to be submitted to the API")
 
-        permissions_boundary_policy_param = CfnParameter(self,
-                "PermissionsBoundaryPolicy", type="String",
-                description="(optional) Policy to be added as permissions boundary to all IAM roles")
+        permissions_boundary_policy_param = self.node.try_get_context("PermissionsBoundaryPolicy")
 
+        if permissions_boundary_policy_param:
+            permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self,
+                'RequiredPermissionBoundary', permissions_boundary_policy_param)
 
-        # need to make boundary policy an optional parameter. update role definitions accordingly.
-        permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, 'PermissionBoundaryLambda', "T_PROJADMIN_U")
-        # create a conditional object
-        iam.PermissionsBoundary.of(self).apply(permissions_boundary)
+            iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
         outgoing_bucket = s3.Bucket.from_bucket_name(self, "Outgoing",
                 outgoing_bucket_param.value_as_string )
-
-        # buckets
-        # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_s3/Bucket.html
-
 
         # SNS for status
         new_object_topic = sns.Topic(self, "NewObjectTopic")
@@ -58,9 +52,6 @@ class UploaderStack(Stack):
             s3.EventType.OBJECT_CREATED,
             s3n.SnsDestination(new_object_topic),
             s3.NotificationKeyFilter(prefix="processed/", suffix=".json") )
-
-        # role(s) for lambdas?
-
 
         # normal lambda permissions, eventbridge actions, s3 read,write,list, SNS, SQS
 
@@ -153,6 +144,7 @@ class UploaderStack(Stack):
         # create a Q for retrying failed calls
         retry_queue = sqs.Queue(
             self, "RetryQueue",
+            retention_period=Duration.days(2),   #seconds(86400),
             visibility_timeout=Duration.seconds(60),
         )
 
