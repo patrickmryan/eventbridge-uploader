@@ -60,7 +60,7 @@ class UploaderStack(Stack):
         outgoing_bucket.add_event_notification(
             s3.EventType.OBJECT_CREATED,
             s3n.SnsDestination(new_object_topic),
-            s3.NotificationKeyFilter(prefix="processed/") )
+            s3.NotificationKeyFilter(prefix="processed/", suffix=".json") )
 
         # role(s) for lambdas?
 
@@ -74,6 +74,8 @@ class UploaderStack(Stack):
 
         # invoke_api
 
+        event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
+
         service_role = iam.Role(self,
             "InvokeApiRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -84,9 +86,13 @@ class UploaderStack(Stack):
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
-                            actions=["s3:GetObject"],
+                            actions=["s3:GetObject", "s3:PutObject"],
                             effect=iam.Effect.ALLOW,
-                            resources=[outgoing_bucket.bucket_arn])
+                            resources=[outgoing_bucket.bucket_arn]),
+                        iam.PolicyStatement(
+                            actions=["events:PutEvents"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[event_bus.event_bus_arn]),
                     ]
                 )
             ])
