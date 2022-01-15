@@ -40,10 +40,6 @@ class UploaderStack(Stack):
         # buckets
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_s3/Bucket.html
 
-        # retry_queue = sqs.Queue(
-        #     self, "RetryQueue",
-        #     visibility_timeout=Duration.seconds(60),
-        # )
 
         # SNS for status
         new_object_topic = sns.Topic(self, "NewObjectTopic")
@@ -143,8 +139,8 @@ class UploaderStack(Stack):
                 role=service_role,
                 log_retention=log_retention)
 
-        # hhttps://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events_targets/README.html#invoke-a-lambda-function
-        succeeded_rule = events.Rule(self, "SucceededRule",
+        # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events_targets/README.html#invoke-a-lambda-function
+        succeeded_rule = events.Rule(self, "ApiSucceededRule",
                 event_pattern=events.EventPattern(
                     detail_type=["API Status"],
                     source=[ call_api_lambda.function_arn ],
@@ -152,4 +148,48 @@ class UploaderStack(Stack):
                         "s3Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "succeeded" ]
                     }),
-                targets = [ targets.LambdaFunction( api_succeeded_lambda) ])
+                targets = [ targets.LambdaFunction(api_succeeded_lambda) ])
+
+        # create a Q for retrying failed calls
+        retry_queue = sqs.Queue(
+            self, "RetryQueue",
+            visibility_timeout=Duration.seconds(60),
+        )
+
+        # role and function for the "failed" case
+        service_role = iam.Role(self,
+            "ApiFailedRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[ iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            inline_policies=[
+                iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["sqs:SendMessage"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[retry_queue.queue_arn]),
+                    ]
+                )
+            ])
+
+        api_failed_lambda = _lambda.Function(
+                self, 'ApiFailed',
+                runtime=runtime,
+                code=_lambda.Code.from_asset('api_failed'),
+                handler='api_failed.lambda_handler',
+                environment= {
+                    'QUEUE_URL' : retry_queue.queue_url
+                },
+                timeout=Duration.seconds(60),
+                role=service_role,
+                log_retention=log_retention)
+
+        failed_rule = events.Rule(self, "ApiFailedRule",
+                event_pattern=events.EventPattern(
+                    detail_type=["API Status"],
+                    source=[ call_api_lambda.function_arn ],
+                    detail={
+                        "s3Bucket" : [ outgoing_bucket.bucket_name ],
+                        "status" : [ "failed" ]
+                    }),
+                targets = [ targets.LambdaFunction(api_failed_lambda) ])

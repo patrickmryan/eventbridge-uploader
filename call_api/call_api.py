@@ -1,4 +1,6 @@
 import os
+import os.path
+import re
 import json
 import boto3
 # from urllib.parse import urlencode
@@ -26,6 +28,7 @@ def lambda_handler(event, context):
 
             s3_info = s3_record['s3']
             s3_object = s3.Object(s3_info['bucket']['name'], s3_info['object']['key'])
+            etag = s3_info['object']['eTag']
             # be careful of hardcoded partition
             # s3_arn = 'arn:aws:s3:::' + s3_object.bucket_name + '/' + s3_object.key
 
@@ -37,10 +40,23 @@ def lambda_handler(event, context):
 
             # determine success, fatal error, or transient failure
 
+
+            # TESTING cleverness
+            filename = os.path.basename(s3_object.key)
+            if re.search('fail', filename, re.I):
+                api_status = 'failed'
+            elif re.search('reject', filename, re.I):
+                api_status = 'rejected'
+            else:
+                api_status = 'succeeded'
+            # TESTING cleverness
+
             detail = {
                 "s3Bucket" : s3_object.bucket_name,
-                "status" : [ "succeeded" ]
+                "s3Object" : s3_object.key,
+                "status" : [ api_status ]
             }
+
             status_event = {
                 "DetailType" : "API Status",
                 'Source' : lambda_arn,
