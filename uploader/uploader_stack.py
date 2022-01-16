@@ -109,9 +109,21 @@ class UploaderStack(Stack):
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
-                            actions=["s3:GetObject", "s3:PutObject"],
+                            actions=[ "s3:GetObject", ],
                             effect=iam.Effect.ALLOW,
-                            resources=[outgoing_bucket.bucket_arn]),
+                            resources=[
+                                self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name),
+                                self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name,
+                                    resource_name='*'),
+                            ]),
+                        iam.PolicyStatement(   # policy for testing purposes
+                            actions=[ "s3:PutObject" ],
+                            effect=iam.Effect.ALLOW,
+                            resources=[
+                                self.format_arn(service='s3', region='', account='', resource='uploader*'),
+                                self.format_arn(service='s3', region='', account='', resource='uploader*',
+                                    resource_name='*'),
+                            ]),
                         iam.PolicyStatement(
                             actions=["events:PutEvents"],
                             effect=iam.Effect.ALLOW,

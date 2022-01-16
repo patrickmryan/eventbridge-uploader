@@ -3,8 +3,6 @@ import os.path
 import re
 import json
 import boto3
-# from urllib.parse import urlencode
-# import urllib3, ssl
 
 TEST_BUCKET='uploader-incoming-test'
 
@@ -23,6 +21,7 @@ def lambda_handler(event, context):
     event_detail = event['detail']
 
     s3 = boto3.resource('s3')
+    s3_client = s3.meta.client
     event_client = boto3.client('events')
     lambda_arn = context.invoked_function_arn
 
@@ -40,10 +39,14 @@ def lambda_handler(event, context):
 
     if api_status == 'succeeded':
         try:
-            target_bucket.copy(
-                { 'Bucket' : s3_object.bucket_name, 'Key' : s3_object.key },
-                f'copied/{s3_object.key}' )
-        except s3.meta.client.exceptions.ClientError as exc:
+            new_object = target_bucket.Object(f'copied/{s3_object.key}')
+            new_object.copy({ 'Bucket' : s3_object.bucket_name, 'Key' : s3_object.key })
+            
+            # target_bucket.copy(
+            #     { 'Bucket' : s3_object.bucket_name, 'Key' : s3_object.key },
+            #     f'copied/{s3_object.key}' )
+
+        except s3_client.exceptions.ClientError as exc:
             print(f'error copying {s3_object} to {target_bucket} - {exc}')
             api_status = 'failed'
 
