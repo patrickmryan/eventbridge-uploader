@@ -16,3 +16,6 @@ def lambda_handler(event, context):
     # for each
     #    determine if enough wait time has elapsed
     #      if not, ignore it and continue
+
+    #      in detail for call_api, append message info
+    #      think about optimal place to delete message

@@ -60,9 +60,42 @@ class UploaderStack(Stack):
         runtime = _lambda.Runtime.PYTHON_3_8
         log_retention=logs.RetentionDays.ONE_WEEK
 
-        # call_api
 
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
+
+        service_role = iam.Role(self,
+            "NewObjectReceivedRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            inline_policies=[
+                iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["events:PutEvents"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[event_bus.event_bus_arn]),
+                    ]
+                )
+            ])
+
+        new_object_received_lambda = _lambda.Function(
+                self, 'NewObjectReceived',
+                runtime=runtime,
+                code=_lambda.Code.from_asset('new_object_received'),
+                handler='new_object_received.lambda_handler',
+                # environment= {
+                #     # 'CREDENTIAL' : udl_credential.value_as_string
+                # },
+                timeout=Duration.seconds(60),
+                role=service_role,
+                log_retention=log_retention)
+
+
+        # subscribe the lambda to the topic
+        new_object_topic.add_subscription(subscriptions.LambdaSubscription(new_object_received_lambda))
+
+        # call_api
 
         # role and function for calling the API
         service_role = iam.Role(self,
@@ -90,16 +123,15 @@ class UploaderStack(Stack):
                 runtime=runtime,
                 code=_lambda.Code.from_asset('call_api'),
                 handler='call_api.lambda_handler',
-                environment= {
-                    # 'CREDENTIAL' : udl_credential.value_as_string
-                },
+                # environment= {
+                #     # 'CREDENTIAL' : udl_credential.value_as_string
+                # },
                 timeout=Duration.seconds(60),
-                # memory_size
                 role=service_role,
                 log_retention=log_retention)
 
-        # subscribe the lambda to the topic
-        new_object_topic.add_subscription(subscriptions.LambdaSubscription(call_api_lambda))
+        # # subscribe the lambda to the topic
+        # new_object_topic.add_subscription(subscriptions.LambdaSubscription(call_api_lambda))
 
         # role and function for the "succeeded" case
         service_role = iam.Role(self,
@@ -212,5 +244,18 @@ class UploaderStack(Stack):
                 timeout=Duration.seconds(60),
                 role=service_role,
                 log_retention=log_retention)
+
+        new_object_received_rule = events.Rule(self, "NewObjectReceivedRule",
+                event_pattern=events.EventPattern(
+                    detail_type=["API Status"],
+                    source=[
+                        new_object_received_lambda.function_arn,
+                        handle_retries_lambda.function_arn
+                    ],
+                    detail={
+                        "s3Bucket" : [ outgoing_bucket.bucket_name ],
+                        "status" : [ "new_object_received" ]
+                    }),
+                targets = [ targets.LambdaFunction(call_api_lambda) ])
 
         # rule to run handle_retries onc per minute
