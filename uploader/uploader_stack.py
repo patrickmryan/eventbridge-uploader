@@ -24,8 +24,10 @@ class UploaderStack(Stack):
                 "OutgoingBucket", type="String",
                 description="Bucket for data to be submitted to the API")
 
+        # this still seems wrong. should still be including conditional logic
+        # in PermissionBoundary value for each Role.
+        # but maybe OK if going to resythesize for each deployment.
         permissions_boundary_policy_param = self.node.try_get_context("PermissionsBoundaryPolicy")
-
         if permissions_boundary_policy_param:
             permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self,
                 'PermissionsBoundary', permissions_boundary_policy_param)
@@ -169,7 +171,7 @@ class UploaderStack(Stack):
                     detail_type=["API Status"],
                     source=[ call_api_lambda.function_arn ],
                     detail={
-                        "s3Bucket" : [ outgoing_bucket.bucket_name ],
+                        "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "succeeded" ]
                     }),
                 targets = [ targets.LambdaFunction(api_succeeded_lambda) ])
@@ -214,7 +216,7 @@ class UploaderStack(Stack):
                     detail_type=["API Status"],
                     source=[ call_api_lambda.function_arn ],
                     detail={
-                        "s3Bucket" : [ outgoing_bucket.bucket_name ],
+                        "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "failed" ]
                     }),
                 targets = [ targets.LambdaFunction(api_failed_lambda) ])
@@ -253,7 +255,7 @@ class UploaderStack(Stack):
                         handle_retries_lambda.function_arn
                     ],
                     detail={
-                        "s3Bucket" : [ outgoing_bucket.bucket_name ],
+                        "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "new_object_received" ]
                     }),
                 targets = [ targets.LambdaFunction(call_api_lambda) ])

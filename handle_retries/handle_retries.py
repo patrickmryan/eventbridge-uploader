@@ -1,10 +1,6 @@
 import os
 import json
 import boto3
-# from urllib.parse import urlencode
-# import urllib3, ssl
-
-
 
 def lambda_handler(event, context):
 
@@ -19,3 +15,9 @@ def lambda_handler(event, context):
 
     #      in detail for call_api, append message info
     #      think about optimal place to delete message
+
+
+
+    queue_url = os.environ.get('QUEUE_URL')
+    sqs = boto3.resource('sqs')
+    retry_queue = sqs.Queue(queue_url)

@@ -21,10 +21,10 @@ def lambda_handler(event, context):
 
             s3_info = s3_record['s3']
             detail = {
-                "s3Bucket" : s3_info['bucket']['name'],
-                "s3Object" : s3_info['object']['key'],
-                "eTag"     : s3_info['object']['eTag'],
-                "status"   : [ "new_object_received" ]
+                "Bucket"  : s3_info['bucket']['name'],
+                "Key"     : s3_info['object']['key'],
+                "eTag"    : s3_info['object']['eTag'],
+                "status"  : [ "new_object_received" ]
             }
 
             status_event = {

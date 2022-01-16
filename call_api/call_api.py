@@ -6,12 +6,78 @@ import boto3
 # from urllib.parse import urlencode
 # import urllib3, ssl
 
+TEST_BUCKET='uploader-incoming-test'
+
+class ApiResult():
+    def event_detail(self, event=None):
+        pass
+
+class Succeeded(ApiResult):
+    pass
 
 
 def lambda_handler(event, context):
 
     # for testing, copy the object to another s3 bucket
     print(json.dumps(event))
+    event_detail = event['detail']
+
+    s3 = boto3.resource('s3')
+    event_client = boto3.client('events')
+    lambda_arn = context.invoked_function_arn
+
+    target_bucket = s3.Bucket(TEST_BUCKET)
+    s3_object = s3.Object(event_detail["Bucket"], event_detail["Key"])
+
+    # TESTING cleverness
+    filename = os.path.basename(s3_object.key)
+    if re.search('fail', filename, re.I):
+        api_status = 'failed'
+    elif re.search('reject', filename, re.I):
+        api_status = 'rejected'
+    else:
+        api_status = 'succeeded'
+
+    if api_status == 'succeeded':
+        try:
+            target_bucket.copy(
+                { 'Bucket' : s3_object.bucket_name, 'Key' : s3_object.key },
+                f'copied/{s3_object.key}' )
+        except s3.meta.client.exceptions.ClientError as exc:
+            print(f'error copying {s3_object} to {target_bucket} - {exc}')
+            api_status = 'failed'
+
+    detail = event_detail.copy()
+    detail['status'] = [ api_status ]
+
+    status_event = {
+        "DetailType" : "API Status",
+        "Source" : lambda_arn,
+        "Detail" : json.dumps(detail)
+    }
+
+    try:
+        print('sending event')
+        print(json.dumps(status_event))
+        response = event_client.put_events(Entries = [status_event])
+
+    except event_client.exceptions.InternalException as exc:
+        print(f'{exc} - ' + json.dumps(status_event))
+
+
+
+    # TESTING cleverness
+
+
+
+    # do the thing
+    # use state pattern for handling 3 exit conditions
+    # success condition handles message deletion, if present
+
+
+
+
+
 
     # dynamo resource
 
