@@ -24,9 +24,6 @@ class UploaderStack(Stack):
                 "OutgoingBucket", type="String",
                 description="Bucket for data to be submitted to the API")
 
-        # this still seems wrong. should still be including conditional logic
-        # in PermissionBoundary value for each Role.
-        # but maybe OK if going to resythesize for each deployment.
         permissions_boundary_policy_param = self.node.try_get_context("PermissionsBoundaryPolicy")
         if permissions_boundary_policy_param:
             permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self,
@@ -62,7 +59,6 @@ class UploaderStack(Stack):
         runtime = _lambda.Runtime.PYTHON_3_8
         log_retention=logs.RetentionDays.ONE_WEEK
 
-
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
 
         service_role = iam.Role(self,
@@ -86,13 +82,9 @@ class UploaderStack(Stack):
                 runtime=runtime,
                 code=_lambda.Code.from_asset('new_object_received'),
                 handler='new_object_received.lambda_handler',
-                # environment= {
-                #     # 'CREDENTIAL' : udl_credential.value_as_string
-                # },
                 timeout=Duration.seconds(60),
                 role=service_role,
                 log_retention=log_retention)
-
 
         # subscribe the lambda to the topic
         new_object_topic.add_subscription(subscriptions.LambdaSubscription(new_object_received_lambda))
@@ -151,8 +143,7 @@ class UploaderStack(Stack):
             visibility_timeout=Duration.seconds(60))
 
         # role and function for the "succeeded" case
-        service_role = iam.Role(self,
-            "ApiSucceededRole",
+        service_role = iam.Role(self, "ApiSucceededRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
@@ -197,8 +188,7 @@ class UploaderStack(Stack):
                 targets = [ targets.LambdaFunction(api_succeeded_lambda) ])
 
         # role and function for the "failed" case
-        service_role = iam.Role(self,
-            "ApiFailedRole",
+        service_role = iam.Role(self, "ApiFailedRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
@@ -213,8 +203,7 @@ class UploaderStack(Stack):
                 )
             ])
 
-        api_failed_lambda = _lambda.Function(
-                self, 'ApiFailed',
+        api_failed_lambda = _lambda.Function( self, 'ApiFailed',
                 runtime=runtime,
                 code=_lambda.Code.from_asset('api_failed'),
                 handler='api_failed.lambda_handler',
@@ -236,8 +225,7 @@ class UploaderStack(Stack):
                 targets = [ targets.LambdaFunction(api_failed_lambda) ])
 
         # handle retries
-        service_role = iam.Role(self,
-            "HandleRetriesRole",
+        service_role = iam.Role(self, "HandleRetriesRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
@@ -256,8 +244,7 @@ class UploaderStack(Stack):
                  )
              ])
 
-        handle_retries_lambda = _lambda.Function(
-                self, 'HandleRetries',
+        handle_retries_lambda = _lambda.Function( self, 'HandleRetries',
                 runtime=runtime,
                 code=_lambda.Code.from_asset('handle_retries'),
                 handler='handle_retries.lambda_handler',
