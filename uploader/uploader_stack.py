@@ -144,8 +144,11 @@ class UploaderStack(Stack):
                 role=service_role,
                 log_retention=log_retention)
 
-        # # subscribe the lambda to the topic
-        # new_object_topic.add_subscription(subscriptions.LambdaSubscription(call_api_lambda))
+        # create a Q for retrying failed calls
+        retry_queue = sqs.Queue(
+            self, "RetryQueue",
+            retention_period=Duration.days(2),
+            visibility_timeout=Duration.seconds(60))
 
         # role and function for the "succeeded" case
         service_role = iam.Role(self,
@@ -159,14 +162,19 @@ class UploaderStack(Stack):
                         iam.PolicyStatement(
                             actions=["s3:GetObject", "s3:PutObject"],
                             effect=iam.Effect.ALLOW,
-                            resources=[outgoing_bucket.bucket_arn]),
-                        # iam.PolicyStatement(
-                        #     actions=["events:PutEvents"],
-                        #     effect=iam.Effect.ALLOW,
-                        #     resources=[event_bus.event_bus_arn]),
+                            resources=[outgoing_bucket.bucket_arn])
+                    ]
+                ),
+                iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            actions=["sqs:DeleteMessage"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[retry_queue.queue_arn]),
                     ]
                 )
-            ])
+            ]
+        )
 
         api_succeeded_lambda = _lambda.Function(
                 self, 'ApiSucceded',
@@ -187,12 +195,6 @@ class UploaderStack(Stack):
                         "status" : [ "succeeded" ]
                     }),
                 targets = [ targets.LambdaFunction(api_succeeded_lambda) ])
-
-        # create a Q for retrying failed calls
-        retry_queue = sqs.Queue(
-            self, "RetryQueue",
-            retention_period=Duration.days(2),
-            visibility_timeout=Duration.seconds(60))
 
         # role and function for the "failed" case
         service_role = iam.Role(self,
@@ -245,7 +247,14 @@ class UploaderStack(Stack):
                         iam.PolicyStatement(
                             actions=["sqs:SendMessage", "sqs:ReceiveMessage"],
                             effect=iam.Effect.ALLOW,
-                            resources=[retry_queue.queue_arn]) ] ) ])
+                            resources=[retry_queue.queue_arn]),
+                        iam.PolicyStatement(
+                            actions=["events:PutEvents"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[event_bus.event_bus_arn]),
+                    ]
+                 )
+             ])
 
         handle_retries_lambda = _lambda.Function(
                 self, 'HandleRetries',
@@ -272,4 +281,9 @@ class UploaderStack(Stack):
                     }),
                 targets = [ targets.LambdaFunction(call_api_lambda) ])
 
-        # rule to run handle_retries onc per minute
+        # rule to run handle_retries once per minute
+
+        handle_retries_rule = events.Rule(self, "HandleRetriesRule",
+                enabled=False,
+                schedule=events.Schedule.rate(Duration.minutes(1)),
+                targets = [ targets.LambdaFunction(handle_retries_lambda) ])
