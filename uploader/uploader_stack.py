@@ -56,8 +56,9 @@ class UploaderStack(Stack):
         # lambdas
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html
 
+        # setting for all python Lambda functions
         runtime = _lambda.Runtime.PYTHON_3_8
-        log_retention=logs.RetentionDays.ONE_WEEK
+        log_retention = logs.RetentionDays.ONE_WEEK
 
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
 
@@ -153,17 +154,17 @@ class UploaderStack(Stack):
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
-                            actions=["s3:GetObject", "s3:PutObject"],
-                            effect=iam.Effect.ALLOW,
-                            resources=[outgoing_bucket.bucket_arn])
-                    ]
-                ),
-                iam.PolicyDocument(
-                    statements=[
-                        iam.PolicyStatement(
                             actions=["sqs:DeleteMessage"],
                             effect=iam.Effect.ALLOW,
                             resources=[retry_queue.queue_arn]),
+                        iam.PolicyStatement(
+                            actions=[ "s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                            effect=iam.Effect.ALLOW,
+                            resources=[
+                                self.format_arn(service='s3', region='', account='', # access to the bucket
+                                    resource=outgoing_bucket.bucket_name),
+                                self.format_arn(service='s3', region='', account='',
+                                    resource=outgoing_bucket.bucket_name, resource_name='*') ]), # access to objects
                     ]
                 )
             ]

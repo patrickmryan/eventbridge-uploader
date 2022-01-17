@@ -51,7 +51,7 @@ def lambda_handler(event, context):
 
         except s3_client.exceptions.ClientError as exc:
             print(f'error copying {s3_object} to {target_bucket} - {exc}')
-            api_status = 'failed'
+            return { "status" : 'failed' }
 
     # end TESTING cleverness
 
