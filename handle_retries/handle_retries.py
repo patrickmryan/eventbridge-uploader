@@ -1,7 +1,7 @@
 import sys
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import boto3
 
 def lambda_handler(event, context):
@@ -10,53 +10,46 @@ def lambda_handler(event, context):
 
     # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-basic-architecture.html
 
-    # iterate through receive_messages
-    # for each
-    #    determine if enough wait time has elapsed
-    #      if not, ignore it and continue
-
-    #      in detail for call_api, append message info
-    #      think about optimal place to delete message
-
     queue_url = os.environ.get('QUEUE_URL')
-    # sqs = boto3.resource('sqs')
-    # sqs_client = sqs.meta.client
-    sqs_client = boto3.client('sqs')
+    sqs = boto3.resource('sqs')
+    sqs_client = sqs.meta.client
+    # sqs_client = boto3.client('sqs')
+
     event_client = boto3.client('events')
-    lambda_arn = 'testing'  ###context.invoked_function_arn
+    lambda_arn = context.invoked_function_arn
 
-    # retry_queue = sqs.Queue(queue_url)
+    retry_queue = sqs.Queue(queue_url)
+    start_time = datetime.now(timezone.utc)
+    end_time = start_time + timedelta(minutes=1)
 
+    messages_processed = 0
     done= False
-    while not done:   # check context value for time remaining
+    # check context value for time remaining?
+    while not done:
         try:
-            mesg_dict = sqs_client.receive_message(
-                    QueueUrl=queue_url,
-                    VisibilityTimeout=60,
+            messages = retry_queue.receive_messages(
+        #             VisibilityTimeout=60,
                     MaxNumberOfMessages=10,
                     WaitTimeSeconds=15)
-
         except sqs_client.exceptions.ClientError as exc:
             print(f'{queue_url} - {exc}')
-            return
+            break
 
-
-        messages = mesg_dict.get('Messages', [])
         if not messages:
             done = True
-            continue  # nothing more to see here
+            continue
 
         for message in messages:
-            print(message['MessageId'])
+            print(message.message_id)
+            body = json.loads(message.body)
 
-            body = json.loads(message["Body"])
             detail = body['detail']
 
-            # create a new message to send to the event bus
+            # create a new event to send to the event bus
             detail["status"] = [ "new_object_received" ]
             detail["message"] = {
-                "queue_url" : queue_url,
-                "receipt_handle" : message["ReceiptHandle"]
+                "queue_url"      : queue_url,
+                "receipt_handle" : message.receipt_handle
             }
 
             status_event = {
@@ -69,13 +62,14 @@ def lambda_handler(event, context):
                 print('sending event')
                 print(json.dumps(status_event))
                 response = event_client.put_events(Entries = [status_event])
+                messages_processed += 1
 
             except event_client.exceptions.InternalException as exc:
                 print(f'{exc} - ' + json.dumps(status_event))
 
+        done = datetime.now(timezone.utc) >= end_time
 
-
-    return
+    return { "messages_processed" : messages_processed }
 
 
 if __name__ == '__main__':

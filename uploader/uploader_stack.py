@@ -84,14 +84,6 @@ class UploaderStack(Stack):
                             actions=[ "events:PutEvents" ],
                             effect=iam.Effect.ALLOW,
                             resources=[event_bus.event_bus_arn]),
-                        # iam.PolicyStatement(
-                        #     actions=[ "s3:GetObject", ],
-                        #     effect=iam.Effect.ALLOW,
-                        #     resources=[
-                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name),
-                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name,
-                        #             resource_name='*'),
-                        #     ]),
                     ]
                 )
             ])
@@ -118,14 +110,6 @@ class UploaderStack(Stack):
                 iam.PolicyDocument(
                     statements=[
                         bucket_read_policy,
-                        # iam.PolicyStatement(
-                        #     actions=[ "s3:GetObject", ],
-                        #     effect=iam.Effect.ALLOW,
-                        #     resources=[
-                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name),
-                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name,
-                        #             resource_name='*'),
-                        #     ]),
                         iam.PolicyStatement(   # policy for testing purposes
                             actions=[ "s3:PutObject" ],
                             effect=iam.Effect.ALLOW,
