@@ -61,6 +61,16 @@ class UploaderStack(Stack):
 
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
 
+        # several roles need read access to the bucket
+        bucket_read_policy = iam.PolicyStatement(
+            actions=[ "s3:GetObject", ],
+            effect=iam.Effect.ALLOW,
+            resources=[
+                self.format_arn(service='s3', region='', account='', # access to the bucket
+                    resource=outgoing_bucket.bucket_name),
+                self.format_arn(service='s3', region='', account='',
+                    resource=outgoing_bucket.bucket_name, resource_name='*') ]) # access to objects
+
         service_role = iam.Role(self,
             "NewObjectReceivedRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -69,10 +79,19 @@ class UploaderStack(Stack):
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
+                        bucket_read_policy,
                         iam.PolicyStatement(
-                            actions=["events:PutEvents"],
+                            actions=[ "events:PutEvents" ],
                             effect=iam.Effect.ALLOW,
                             resources=[event_bus.event_bus_arn]),
+                        # iam.PolicyStatement(
+                        #     actions=[ "s3:GetObject", ],
+                        #     effect=iam.Effect.ALLOW,
+                        #     resources=[
+                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name),
+                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name,
+                        #             resource_name='*'),
+                        #     ]),
                     ]
                 )
             ])
@@ -89,8 +108,6 @@ class UploaderStack(Stack):
         # subscribe the lambda to the topic
         new_object_topic.add_subscription(subscriptions.LambdaSubscription(new_object_received_lambda))
 
-        # call_api
-
         # role and function for calling the API
         service_role = iam.Role(self,
             "CallApiRole",
@@ -100,14 +117,15 @@ class UploaderStack(Stack):
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
-                        iam.PolicyStatement(
-                            actions=[ "s3:GetObject", ],
-                            effect=iam.Effect.ALLOW,
-                            resources=[
-                                self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name),
-                                self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name,
-                                    resource_name='*'),
-                            ]),
+                        bucket_read_policy,
+                        # iam.PolicyStatement(
+                        #     actions=[ "s3:GetObject", ],
+                        #     effect=iam.Effect.ALLOW,
+                        #     resources=[
+                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name),
+                        #         self.format_arn(service='s3', region='', account='', resource=outgoing_bucket.bucket_name,
+                        #             resource_name='*'),
+                        #     ]),
                         iam.PolicyStatement(   # policy for testing purposes
                             actions=[ "s3:PutObject" ],
                             effect=iam.Effect.ALLOW,

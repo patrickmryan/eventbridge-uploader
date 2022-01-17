@@ -2,6 +2,7 @@ import os
 import os.path
 import re
 import json
+from datetime import datetime, timezone
 import boto3
 
 TEST_BUCKET='uploader-incoming-test'
@@ -26,12 +27,17 @@ def lambda_handler(event, context):
     sqs = boto3.resource('sqs')
     lambda_arn = context.invoked_function_arn
 
+    # begin TESTING cleverness
+
     target_bucket = s3.Bucket(TEST_BUCKET)
     s3_object = s3.Object(event_detail["Bucket"], event_detail["Key"])
+    last_modified = datetime.fromisoformat(event_detail["LastModified"])
+    now = datetime.now(timezone.utc)
+    elapsed_seconds = (now - last_modified).total_seconds()
 
-    # TESTING cleverness
     filename = os.path.basename(s3_object.key)
-    if re.search('fail', filename, re.I):
+    if re.search('fail', filename, re.I) and elapsed_seconds < 180:
+        # after 180 seconds, let the transfer succeed
         api_status = 'failed'
     elif re.search('reject', filename, re.I):
         api_status = 'rejected'
@@ -46,6 +52,8 @@ def lambda_handler(event, context):
         except s3_client.exceptions.ClientError as exc:
             print(f'error copying {s3_object} to {target_bucket} - {exc}')
             api_status = 'failed'
+
+    # end TESTING cleverness
 
     detail = event_detail.copy()
     detail['status'] = [ api_status ]

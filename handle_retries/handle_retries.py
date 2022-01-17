@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 from datetime import datetime, timedelta
@@ -22,14 +23,18 @@ def lambda_handler(event, context):
     # sqs_client = sqs.meta.client
     sqs_client = boto3.client('sqs')
     event_client = boto3.client('events')
-    lambda_arn = context.invoked_function_arn
+    lambda_arn = 'testing'  ###context.invoked_function_arn
 
     # retry_queue = sqs.Queue(queue_url)
 
     done= False
-    while not done:
+    while not done:   # check context value for time remaining
         try:
-            mesg_dict = sqs_client.receive_message(QueueUrl=queue_url, WaitTimeSeconds=15) ##, VisibilityTimeout=60
+            mesg_dict = sqs_client.receive_message(
+                    QueueUrl=queue_url,
+                    VisibilityTimeout=60,
+                    MaxNumberOfMessages=10,
+                    WaitTimeSeconds=15)
 
         except sqs_client.exceptions.ClientError as exc:
             print(f'{queue_url} - {exc}')
@@ -42,7 +47,7 @@ def lambda_handler(event, context):
             continue  # nothing more to see here
 
         for message in messages:
-            # print(message)
+            print(message['MessageId'])
 
             body = json.loads(message["Body"])
             detail = body['detail']
@@ -76,7 +81,11 @@ def lambda_handler(event, context):
 if __name__ == '__main__':
     import pdb
 
-    lambda_handler(event={}, context={})
+    event={}
+    # with open(sys.argv[1], 'r') as fp:
+    #     event = json.load(fp)
+
+    lambda_handler(event=event, context={})
 
     # "invoked_function_arn":
     #     "arn:aws:lambda:us-east-1:458358814065:function:UploaderStack-HandleRetriesCC180680-4dxbnXpWEBRc"

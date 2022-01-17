@@ -2,7 +2,9 @@ import os
 import os.path
 import re
 import json
+from datetime import datetime, timedelta
 import boto3
+
 # from urllib.parse import urlencode
 # import urllib3, ssl
 
@@ -20,11 +22,20 @@ def lambda_handler(event, context):
         for s3_record in loaded['Records']:
 
             s3_info = s3_record['s3']
+            # detail = {
+            #     "Bucket"  : s3_info['bucket']['name'],
+            #     "Key"     : s3_info['object']['key'],
+            #     "eTag"    : s3_info['object']['eTag'],
+            #     "status"  : [ "new_object_received" ]
+            # }
+
+            s3_object = s3.Object(s3_info['bucket']['name'], s3_info['object']['key'])
             detail = {
-                "Bucket"  : s3_info['bucket']['name'],
-                "Key"     : s3_info['object']['key'],
-                "eTag"    : s3_info['object']['eTag'],
-                "status"  : [ "new_object_received" ]
+                "Bucket"       : s3_object.bucket_name,
+                "Key"          : s3_object.key,
+                "LastModified" : s3_object.last_modified.isoformat(),
+                "eTag"         : s3_object.e_tag,
+                "status"       : [ "new_object_received" ]
             }
 
             status_event = {
