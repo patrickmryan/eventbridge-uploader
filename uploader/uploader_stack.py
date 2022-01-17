@@ -171,7 +171,7 @@ class UploaderStack(Stack):
         )
 
         api_succeeded_lambda = _lambda.Function(
-                self, 'ApiSucceded',
+                self, 'ApiSucceeded',
                 runtime=runtime,
                 code=_lambda.Code.from_asset('api_succeeded'),
                 handler='api_succeeded.lambda_handler',
