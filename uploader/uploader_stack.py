@@ -63,8 +63,6 @@ class UploaderStack(Stack):
             s3n.SnsDestination(new_object_topic),
             s3.NotificationKeyFilter(prefix="processed/", suffix=".json") )
 
-        # normal lambda permissions, eventbridge actions, s3 read,write,list, SNS, SQS
-
         # lambdas
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html
 
@@ -73,11 +71,12 @@ class UploaderStack(Stack):
         log_retention = logs.RetentionDays.ONE_WEEK
 
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
-        basic_lambda_policy = iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole')
+        basic_lambda_policy = iam.ManagedPolicy.from_aws_managed_policy_name(
+                'service-role/AWSLambdaBasicExecutionRole')
 
         # several roles need read access to the bucket
         bucket_read_policy = iam.PolicyStatement(
-            actions=[ "s3:GetObject", ],
+            actions=[ "s3:GetObject" ],
             effect=iam.Effect.ALLOW,
             resources=[
                 self.format_arn(service='s3', region='', account='', # access to the bucket
@@ -95,11 +94,7 @@ class UploaderStack(Stack):
                         bucket_read_policy,
                         iam.PolicyStatement(
                             actions=[ "events:PutEvents" ],
-                            effect=iam.Effect.ALLOW,
-                            resources=[event_bus.event_bus_arn]),
-                    ]
-                )
-            ])
+                            effect=iam.Effect.ALLOW, resources=[event_bus.event_bus_arn]) ] ) ])
 
         new_object_received_lambda = _lambda.Function(
                 self, 'NewObjectReceived',
@@ -133,10 +128,7 @@ class UploaderStack(Stack):
                         iam.PolicyStatement(
                             actions=[ "events:PutEvents" ],
                             effect=iam.Effect.ALLOW,
-                            resources=[event_bus.event_bus_arn]),
-                    ]
-                )
-            ])
+                            resources=[event_bus.event_bus_arn]), ] ) ])
 
         call_api_lambda = _lambda.Function(
                 self, 'CallApi',
@@ -155,9 +147,6 @@ class UploaderStack(Stack):
             self, "RetryQueue",
             retention_period=Duration.days(2),
             visibility_timeout=Duration.seconds(60))
-
-        # role and function for the "succeeded" case
-
 
         service_role = iam.Role(self, "DeleteMessageRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -187,7 +176,6 @@ class UploaderStack(Stack):
                         "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "succeeded" ],
                         "message" : { "queue_url": [ { "exists": True } ] }
-                        # "message" : [ { "exists": True } ]
                     }),
                 targets = [ targets.LambdaFunction(delete_message_lambda) ])
 
@@ -223,7 +211,6 @@ class UploaderStack(Stack):
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "succeeded" ],
-                        ###"message" : [ { "" : { "exists": True } } ]
                     }),
                 targets = [ targets.LambdaFunction(delete_object_lambda) ])
 
@@ -258,8 +245,9 @@ class UploaderStack(Stack):
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "failed" ],
+                        # next rule ensures that a failed API call results
+                        # in exactly one message being put in the Q.
                         "message" : { "queue_url": [ { "exists": False } ] }
-                        # "message" : [ { "exists": False } ]
                     }),
                 targets = [ targets.LambdaFunction(send_to_retry_queue_lambda) ])
 
@@ -308,7 +296,6 @@ class UploaderStack(Stack):
                 targets = [ targets.LambdaFunction(call_api_lambda) ])
 
         # rule to run handle_retries once per minute
-
         handle_retries_rule = events.Rule(self, "HandleRetriesRule",
                 enabled=False,
                 schedule=events.Schedule.rate(Duration.minutes(1)),

@@ -36,7 +36,7 @@ def lambda_handler(event, context):
     elapsed_seconds = (now - last_modified).total_seconds()
 
     filename = os.path.basename(s3_object.key)
-    if re.search('fail', filename, re.I) and elapsed_seconds < 180:
+    if re.search('fail', filename, re.I) and elapsed_seconds < 120:
         # after 180 seconds, let the transfer succeed
         api_status = 'failed'
     elif re.search('reject', filename, re.I):
@@ -57,8 +57,6 @@ def lambda_handler(event, context):
 
     detail = event_detail.copy()
     detail['status'] = [ api_status ]
-    # if 'message' not in detail:   # not sure about this
-    #     detail['message'] = ''
 
     status_event = {
         "DetailType" : "API Status",

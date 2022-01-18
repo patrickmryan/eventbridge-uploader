@@ -22,12 +22,6 @@ def lambda_handler(event, context):
         for s3_record in loaded['Records']:
 
             s3_info = s3_record['s3']
-            # detail = {
-            #     "Bucket"  : s3_info['bucket']['name'],
-            #     "Key"     : s3_info['object']['key'],
-            #     "eTag"    : s3_info['object']['eTag'],
-            #     "status"  : [ "new_object_received" ]
-            # }
 
             s3_object = s3.Object(s3_info['bucket']['name'], s3_info['object']['key'])
             detail = {
@@ -55,6 +49,5 @@ def lambda_handler(event, context):
 
             except event_client.exceptions.InternalException as exc:
                 print(f'{exc} - ' + json.dumps(status_event))
-
 
     return { "status" : "success" }
