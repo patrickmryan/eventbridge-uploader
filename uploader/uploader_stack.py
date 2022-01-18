@@ -186,7 +186,8 @@ class UploaderStack(Stack):
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "succeeded" ],
-                        "message" : [ { "exists": True } ]
+                        "message" : { "queue_url": [ { "exists": True } ] }
+                        # "message" : [ { "exists": True } ]
                     }),
                 targets = [ targets.LambdaFunction(delete_message_lambda) ])
 
@@ -257,7 +258,8 @@ class UploaderStack(Stack):
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
                         "status" : [ "failed" ],
-                        "message" : [ { "exists": False } ]
+                        "message" : { "queue_url": [ { "exists": False } ] }
+                        # "message" : [ { "exists": False } ]
                     }),
                 targets = [ targets.LambdaFunction(send_to_retry_queue_lambda) ])
 
