@@ -1,7 +1,8 @@
 from aws_cdk import (
     Duration,
     Stack,
-    CfnParameter, # CfnCondition, Fn,
+    CfnParameter,
+    region_info,
     aws_iam as iam,
     aws_logs as logs,
     aws_sqs as sqs,
@@ -13,6 +14,7 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets
 )
+#from aws_cdk.region_info import RegionInfo
 from constructs import Construct
 
 class UploaderStack(Stack):
@@ -33,6 +35,14 @@ class UploaderStack(Stack):
         outgoing_bucket = s3.Bucket.from_bucket_name(self, "Outgoing",
                 outgoing_bucket_param.value_as_string )
 
+        # standard service principals
+        # this_region = Stack.of(self).region
+        # region = region_info.RegionInfo.get(Stack.of(self).region)
+        # s3_principal = region.service_principal('s3.amazonaws.com')
+
+        # s3_principal     = region.service_principal(service='s3.amazonaws.com')
+        # lambda_principal = region_info.RegionInfo.service_principal(service='lambda')
+
         # SNS for notification of new objects
         new_object_topic = sns.Topic(self, "NewObjectTopic")
         topic_policy = sns.TopicPolicy(self,
@@ -42,6 +52,8 @@ class UploaderStack(Stack):
                 iam.PolicyStatement(
                 actions=["sns:Subscribe"],
                 principals=[ iam.ServicePrincipal("s3.amazonaws.com") ],
+                # principals=[ s3_principal ],  # "s3.amazonaws.com"
+                # principals=[ iam.ServicePrincipal(s3_principal) ],
                 resources=[new_object_topic.topic_arn]))
 
         # https://constructs.dev/packages/@aws-cdk/aws-s3/v/1.139.0?lang=python
@@ -120,7 +132,7 @@ class UploaderStack(Stack):
                                     resource_name='*'),
                             ]),
                         iam.PolicyStatement(
-                            actions=["events:PutEvents"],
+                            actions=[ "events:PutEvents" ],
                             effect=iam.Effect.ALLOW,
                             resources=[event_bus.event_bus_arn]),
                     ]

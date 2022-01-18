@@ -43,7 +43,7 @@ def lambda_handler(event, context):
             print(message.message_id)
             body = json.loads(message.body)
 
-            detail = body['detail']
+            detail = (body['detail']).copy()
 
             # create a new event to send to the event bus
             detail["status"] = [ "new_object_received" ]
