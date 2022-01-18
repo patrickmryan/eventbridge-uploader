@@ -35,7 +35,7 @@ def lambda_handler(event, context):
                 "Key"          : s3_object.key,
                 "LastModified" : s3_object.last_modified.isoformat(),
                 "eTag"         : s3_object.e_tag,
-                "status"       : [ "new_object_received" ]
+                "status"       : [ "ready_for_api" ]    # [ "new_object_received" ]
             }
 
             status_event = {

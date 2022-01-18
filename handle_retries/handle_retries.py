@@ -46,7 +46,7 @@ def lambda_handler(event, context):
             detail = (body['detail']).copy()
 
             # create a new event to send to the event bus
-            detail["status"] = [ "new_object_received" ]
+            detail["status"] = [ "ready_for_api" ]
             detail["message"] = {
                 "queue_url"      : queue_url,
                 "receipt_handle" : message.receipt_handle

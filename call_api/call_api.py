@@ -57,6 +57,8 @@ def lambda_handler(event, context):
 
     detail = event_detail.copy()
     detail['status'] = [ api_status ]
+    # if 'message' not in detail:   # not sure about this
+    #     detail['message'] = ''
 
     status_event = {
         "DetailType" : "API Status",

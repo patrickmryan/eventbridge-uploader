@@ -73,6 +73,7 @@ class UploaderStack(Stack):
         log_retention = logs.RetentionDays.ONE_WEEK
 
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
+        basic_lambda_policy = iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole')
 
         # several roles need read access to the bucket
         bucket_read_policy = iam.PolicyStatement(
@@ -87,8 +88,7 @@ class UploaderStack(Stack):
         service_role = iam.Role(self,
             "NewObjectReceivedRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[ basic_lambda_policy ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
@@ -117,8 +117,7 @@ class UploaderStack(Stack):
         service_role = iam.Role(self,
             "CallApiRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[ basic_lambda_policy ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
@@ -158,70 +157,92 @@ class UploaderStack(Stack):
             visibility_timeout=Duration.seconds(60))
 
         # role and function for the "succeeded" case
-        service_role = iam.Role(self, "ApiSucceededRole",
+
+
+        service_role = iam.Role(self, "DeleteMessageRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[ basic_lambda_policy ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
                             actions=["sqs:DeleteMessage"],
                             effect=iam.Effect.ALLOW,
-                            resources=[retry_queue.queue_arn]),
+                            resources=[retry_queue.queue_arn]) ] ) ] )
+
+        delete_message_lambda = _lambda.Function(
+                self, 'DeleteMessage',
+                runtime=runtime,
+                code=_lambda.Code.from_asset('delete_message'),
+                handler='delete_message.lambda_handler',
+                timeout=Duration.seconds(60),
+                role=service_role,
+                log_retention=log_retention)
+
+        delete_message_rule = events.Rule(self, "DeleteMessageRule",
+                event_pattern=events.EventPattern(
+                    detail_type=["API Status"],
+                    source=[ call_api_lambda.function_arn ],
+                    detail={
+                        "Bucket" : [ outgoing_bucket.bucket_name ],
+                        "status" : [ "succeeded" ],
+                        "message" : [ { "exists": True } ]
+                    }),
+                targets = [ targets.LambdaFunction(delete_message_lambda) ])
+
+        service_role = iam.Role(self, "DeleteObjectRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[ basic_lambda_policy ],
+            inline_policies=[
+                iam.PolicyDocument(
+                    statements=[
                         iam.PolicyStatement(
-                            actions=[ "s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                            actions=[ "s3:DeleteObject"],
                             effect=iam.Effect.ALLOW,
                             resources=[
                                 self.format_arn(service='s3', region='', account='', # access to the bucket
                                     resource=outgoing_bucket.bucket_name),
                                 self.format_arn(service='s3', region='', account='',
                                     resource=outgoing_bucket.bucket_name, resource_name='*') ]), # access to objects
-                    ]
-                )
-            ]
-        )
+                    ] ) ] )
 
-        api_succeeded_lambda = _lambda.Function(
-                self, 'ApiSucceeded',
+        delete_object_lambda = _lambda.Function(
+                self, 'DeleteObject',
                 runtime=runtime,
-                code=_lambda.Code.from_asset('api_succeeded'),
-                handler='api_succeeded.lambda_handler',
+                code=_lambda.Code.from_asset('delete_object'),
+                handler='delete_object.lambda_handler',
                 timeout=Duration.seconds(60),
                 role=service_role,
                 log_retention=log_retention)
 
-        # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events_targets/README.html#invoke-a-lambda-function
-        succeeded_rule = events.Rule(self, "ApiSucceededRule",
+        delete_object_rule = events.Rule(self, "DeleteObjectRule",
                 event_pattern=events.EventPattern(
                     detail_type=["API Status"],
                     source=[ call_api_lambda.function_arn ],
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
-                        "status" : [ "succeeded" ]
+                        "status" : [ "succeeded" ],
+                        ###"message" : [ { "" : { "exists": True } } ]
                     }),
-                targets = [ targets.LambdaFunction(api_succeeded_lambda) ])
+                targets = [ targets.LambdaFunction(delete_object_lambda) ])
+
 
         # role and function for the "failed" case
-        service_role = iam.Role(self, "ApiFailedRole",
+        service_role = iam.Role(self, "SendToRetryQueueRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+            managed_policies=[ basic_lambda_policy ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
                             actions=["sqs:SendMessage"],
                             effect=iam.Effect.ALLOW,
-                            resources=[retry_queue.queue_arn]),
-                    ]
-                )
-            ])
+                            resources=[ retry_queue.queue_arn ]) ] ) ])
 
-        api_failed_lambda = _lambda.Function( self, 'ApiFailed',
+        send_to_retry_queue_lambda = _lambda.Function( self, 'SendToRetryQueue',
                 runtime=runtime,
-                code=_lambda.Code.from_asset('api_failed'),
-                handler='api_failed.lambda_handler',
+                code=_lambda.Code.from_asset('send_to_retry_queue'),
+                handler='send_to_retry_queue.lambda_handler',
                 environment= {
                     'QUEUE_URL' : retry_queue.queue_url
                 },
@@ -235,20 +256,21 @@ class UploaderStack(Stack):
                     source=[ call_api_lambda.function_arn ],
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
-                        "status" : [ "failed" ]
+                        "status" : [ "failed" ],
+                        "message" : [ { "exists": False } ]
                     }),
-                targets = [ targets.LambdaFunction(api_failed_lambda) ])
+                targets = [ targets.LambdaFunction(send_to_retry_queue_lambda) ])
 
         # handle retries
         service_role = iam.Role(self, "HandleRetriesRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole') ],
+                basic_lambda_policy ],
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
-                            actions=["sqs:SendMessage", "sqs:ReceiveMessage"],
+                            actions=["sqs:ReceiveMessage"], # "sqs:SendMessage",
                             effect=iam.Effect.ALLOW,
                             resources=[retry_queue.queue_arn]),
                         iam.PolicyStatement(
@@ -270,7 +292,7 @@ class UploaderStack(Stack):
                 role=service_role,
                 log_retention=log_retention)
 
-        new_object_received_rule = events.Rule(self, "NewObjectReceivedRule",
+        ready_for_api_rule = events.Rule(self, "ReadyForApiRule",
                 event_pattern=events.EventPattern(
                     detail_type=["API Status"],
                     source=[
@@ -279,7 +301,7 @@ class UploaderStack(Stack):
                     ],
                     detail={
                         "Bucket" : [ outgoing_bucket.bucket_name ],
-                        "status" : [ "new_object_received" ]
+                        "status" : [ "ready_for_api" ]
                     }),
                 targets = [ targets.LambdaFunction(call_api_lambda) ])
 
