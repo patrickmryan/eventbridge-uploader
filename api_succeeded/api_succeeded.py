@@ -33,4 +33,4 @@ def lambda_handler(event, context):
     #     print(f'error deleting {s3_object} - {exc}')
     #     status = 'failed'
 
-    return { "status" : 'api_succeeded' }
+    return {"status": "api_succeeded"}
