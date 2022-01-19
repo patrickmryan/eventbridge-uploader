@@ -2,11 +2,8 @@ import os
 import os.path
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import boto3
-
-# from urllib.parse import urlencode
-# import urllib3, ssl
 
 
 def lambda_handler(event, context):
@@ -18,13 +15,24 @@ def lambda_handler(event, context):
 
     s3_info = event["detail"]
 
+    received_time = None
+    try:
+        time_string = re.sub(r"Z$", "+00:00", event["time"])
+        received_time = datetime.fromisoformat(time_string)
+    except ValueError as exc:
+        print("could not parse datetime")
+
+    if not received_time:
+        received_time = datetime.now(timezone.utc)
+
     s3_object = s3.Object(s3_info["bucket"]["name"], s3_info["object"]["key"])
     detail = {
         "Bucket": s3_object.bucket_name,
         "Key": s3_object.key,
         "LastModified": s3_object.last_modified.isoformat(),
         "eTag": s3_object.e_tag,
-        "status": ["ready_for_api"],  # [ "new_object_received" ]
+        "received": received_time.isoformat(),
+        "status": ["ready_for_api"],
     }
 
     status_event = {
