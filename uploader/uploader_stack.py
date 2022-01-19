@@ -39,6 +39,13 @@ class UploaderStack(Stack):
             )
             iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
+        # If debugging is enabled, set up a dict with an environment
+        # variable in Lambda.
+        debug_param_value = self.node.try_get_context("EnableDebug")
+        debug_env = {}
+        if debug_param_value and debug_param_value.lower() == "true":
+            debug_env["DEBUG"] = "true"
+
         outgoing_bucket = s3.Bucket.from_bucket_name(
             self,
             "Outgoing",
@@ -116,6 +123,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("new_object_received"),
             handler="new_object_received.lambda_handler",
+            environment={**debug_env},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
@@ -183,9 +191,10 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("call_api"),
             handler="call_api.lambda_handler",
-            # environment= {
-            #     # 'CREDENTIAL' : udl_credential.value_as_string
-            # },
+            environment={
+                **debug_env
+                # 'CREDENTIAL' : udl_credential.value_as_string
+            },
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
@@ -223,6 +232,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("delete_message"),
             handler="delete_message.lambda_handler",
+            environment={**debug_env},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
@@ -267,6 +277,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("delete_object"),
             handler="delete_object.lambda_handler",
+            environment={**debug_env},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
@@ -311,7 +322,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("send_to_retry_queue"),
             handler="send_to_retry_queue.lambda_handler",
-            environment={"QUEUE_URL": retry_queue.queue_url},
+            environment={**debug_env, "QUEUE_URL": retry_queue.queue_url},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
@@ -344,7 +355,7 @@ class UploaderStack(Stack):
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
-                            actions=["sqs:ReceiveMessage"],  # "sqs:SendMessage",
+                            actions=["sqs:ReceiveMessage"],
                             effect=iam.Effect.ALLOW,
                             resources=[retry_queue.queue_arn],
                         ),
@@ -364,7 +375,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("handle_retries"),
             handler="handle_retries.lambda_handler",
-            environment={"QUEUE_URL": retry_queue.queue_url},
+            environment={**debug_env, "QUEUE_URL": retry_queue.queue_url},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,

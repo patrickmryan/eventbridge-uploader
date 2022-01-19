@@ -7,7 +7,8 @@ import boto3
 
 def lambda_handler(event, context):
 
-    print(json.dumps(event))
+    if "DEBUG" in os.environ:
+        print(json.dumps(event))
 
     # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-basic-architecture.html
 

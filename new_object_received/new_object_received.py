@@ -8,7 +8,8 @@ import boto3
 
 def lambda_handler(event, context):
 
-    print(json.dumps(event))
+    if "DEBUG" in os.environ:
+        print(json.dumps(event))
 
     s3 = boto3.resource("s3")
     event_client = boto3.client("events")
@@ -17,8 +18,11 @@ def lambda_handler(event, context):
 
     received_time = None
     try:
-        time_string = re.sub(r"Z$", "+00:00", event["time"])
-        received_time = datetime.fromisoformat(time_string)
+        event_time = event.get("time")
+        if event_time:
+            time_string = re.sub(r"Z$", "+00:00", event_time)
+            received_time = datetime.fromisoformat(time_string)
+
     except ValueError as exc:
         print("could not parse datetime")
 
