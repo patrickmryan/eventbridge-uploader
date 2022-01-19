@@ -23,12 +23,15 @@ class UploaderStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        outgoing_bucket_param = CfnParameter(
-            self,
-            "OutgoingBucket",
-            type="String",
-            description="Bucket for data to be submitted to the API",
-        )
+        # outgoing_bucket_param = CfnParameter(
+        #     self,
+        #     "OutgoingBucket",
+        #     type="String",
+        #     description="Bucket for data to be submitted to the API",
+        # )
+
+        existing_bucket_param = self.node.try_get_context("ExistingBucket")
+        outgoing_bucket_param = self.node.try_get_context("OutgoingBucket")
 
         permissions_boundary_policy_param = self.node.try_get_context(
             "PermissionsBoundaryPolicy"
@@ -39,19 +42,26 @@ class UploaderStack(Stack):
             )
             iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
-        # If debugging is enabled, set up a dict with an environment
-        # variable in Lambda.
-        debug_param_value = self.node.try_get_context("EnableDebug")
+        # If debugging is enabled, set up a dict with an environment variable in Lambda.
         debug_env = {}
+        debug_param_value = self.node.try_get_context("EnableDebug")
         if debug_param_value and debug_param_value.lower() == "true":
             debug_env["DEBUG"] = "true"
 
-        outgoing_bucket = s3.Bucket.from_bucket_name(
-            self,
-            "Outgoing",
-            outgoing_bucket_param.value_as_string,
-            # event_bridge_enabled=True
-        )
+        if existing_bucket_param:
+            outgoing_bucket = s3.Bucket.from_bucket_name(
+                self,
+                "Outgoing",
+                existing_bucket_param,  # .value_as_string,
+                # event_bridge_enabled=True
+            )
+        else:
+            outgoing_bucket = s3.Bucket(
+                self,
+                "Outgoing",
+                bucket_name=outgoing_bucket_param,  # .value_as_string,
+                event_bridge_enabled=True,
+            )
 
         # standard service principals
         # this_region = Stack.of(self).region
@@ -136,7 +146,7 @@ class UploaderStack(Stack):
         prefix = "processed/"  # for testing
         put_object_rule = events.Rule(
             self,
-            "OutgoingPutObject",
+            "S3EventPutObject",  # "OutgoingPutObject",
             event_pattern=events.EventPattern(
                 detail_type=["Object Created"],
                 source=["aws.s3"],
@@ -191,10 +201,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("call_api"),
             handler="call_api.lambda_handler",
-            environment={
-                **debug_env
-                # 'CREDENTIAL' : udl_credential.value_as_string
-            },
+            environment={**debug_env},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
