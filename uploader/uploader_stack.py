@@ -183,16 +183,9 @@ class UploaderStack(Stack):
                 iam.PolicyDocument(
                     statements=[
                         iam.PolicyStatement(
-                            actions=[ "s3:DeleteObject"],
+                            actions=[ "s3:DeleteObject" ],
                             effect=iam.Effect.ALLOW,
-                            resources=bucket_resources
-                            # resources=[
-                            #     self.format_arn(service='s3', region='', account='', # access to the bucket
-                            #         resource=outgoing_bucket.bucket_name),
-                            #     self.format_arn(service='s3', region='', account='',
-                            #         resource=outgoing_bucket.bucket_name, resource_name='*') ], # access to objects
-                            )
-                    ] ) ] )
+                            resources=bucket_resources ) ] ) ] )
 
         delete_object_lambda = _lambda.Function(
                 self, 'DeleteObject',
@@ -212,7 +205,6 @@ class UploaderStack(Stack):
                         "status" : [ "succeeded" ],
                     }),
                 targets = [ targets.LambdaFunction(delete_object_lambda) ])
-
 
         # role and function for the "failed" case
         service_role = iam.Role(self, "SendToRetryQueueRole",
