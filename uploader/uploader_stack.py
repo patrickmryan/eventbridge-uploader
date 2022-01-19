@@ -33,7 +33,9 @@ class UploaderStack(Stack):
             iam.PermissionsBoundary.of(self).apply(permissions_boundary)
 
         outgoing_bucket = s3.Bucket.from_bucket_name(self, "Outgoing",
-                outgoing_bucket_param.value_as_string )
+                outgoing_bucket_param.value_as_string,
+                # event_bridge_enabled=True
+                )
 
         # standard service principals
         # this_region = Stack.of(self).region
@@ -42,26 +44,6 @@ class UploaderStack(Stack):
 
         # s3_principal     = region.service_principal(service='s3.amazonaws.com')
         # lambda_principal = region_info.RegionInfo.service_principal(service='lambda')
-
-        # SNS for notification of new objects
-        new_object_topic = sns.Topic(self, "NewObjectTopic")
-        topic_policy = sns.TopicPolicy(self,
-                    "NewObjectTopicPolicy",
-                    topics=[new_object_topic])
-        topic_policy.document.add_statements(
-                iam.PolicyStatement(
-                actions=["sns:Subscribe"],
-                principals=[ iam.ServicePrincipal("s3.amazonaws.com") ],
-                # principals=[ s3_principal ],  # "s3.amazonaws.com"
-                # principals=[ iam.ServicePrincipal(s3_principal) ],
-                resources=[new_object_topic.topic_arn]))
-
-        # https://constructs.dev/packages/@aws-cdk/aws-s3/v/1.139.0?lang=python
-
-        outgoing_bucket.add_event_notification(
-            s3.EventType.OBJECT_CREATED,
-            s3n.SnsDestination(new_object_topic),
-            s3.NotificationKeyFilter(prefix="processed/", suffix=".json") )
 
         # lambdas
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html
@@ -75,14 +57,19 @@ class UploaderStack(Stack):
                 'service-role/AWSLambdaBasicExecutionRole')
 
         # several roles need read access to the bucket
+        bucket_resources = [
+           # access to the bucket
+            self.format_arn(service='s3', region='', account='',
+                resource=outgoing_bucket.bucket_name),
+            # access to objects
+            self.format_arn(service='s3', region='', account='',
+                resource=outgoing_bucket.bucket_name, resource_name='*')
+        ]
+
         bucket_read_policy = iam.PolicyStatement(
             actions=[ "s3:GetObject" ],
             effect=iam.Effect.ALLOW,
-            resources=[
-                self.format_arn(service='s3', region='', account='', # access to the bucket
-                    resource=outgoing_bucket.bucket_name),
-                self.format_arn(service='s3', region='', account='',
-                    resource=outgoing_bucket.bucket_name, resource_name='*') ]) # access to objects
+            resources=bucket_resources)
 
         service_role = iam.Role(self,
             "NewObjectReceivedRole",
@@ -105,8 +92,18 @@ class UploaderStack(Stack):
                 role=service_role,
                 log_retention=log_retention)
 
-        # subscribe the lambda to the topic
-        new_object_topic.add_subscription(subscriptions.LambdaSubscription(new_object_received_lambda))
+        # rule for receiving events when PutObject happens
+        # https://docs.aws.amazon.com/AmazonS3/latest/userguide/ev-events.html
+        # https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns-content-based-filtering.html
+
+        prefix='processed/' # for testing
+        put_object_rule = events.Rule(self, "OutgoingPutObject",
+                event_pattern=events.EventPattern(
+                    detail_type=["Object Created"],
+                    source=[ "aws.s3" ],
+                    resources=[ outgoing_bucket.bucket_arn ],
+                    detail= { "object" : { "key" : [ { "prefix" : prefix } ] } } ),
+                targets = [ targets.LambdaFunction(new_object_received_lambda) ])
 
         # role and function for calling the API
         service_role = iam.Role(self,
@@ -188,11 +185,13 @@ class UploaderStack(Stack):
                         iam.PolicyStatement(
                             actions=[ "s3:DeleteObject"],
                             effect=iam.Effect.ALLOW,
-                            resources=[
-                                self.format_arn(service='s3', region='', account='', # access to the bucket
-                                    resource=outgoing_bucket.bucket_name),
-                                self.format_arn(service='s3', region='', account='',
-                                    resource=outgoing_bucket.bucket_name, resource_name='*') ]), # access to objects
+                            resources=bucket_resources
+                            # resources=[
+                            #     self.format_arn(service='s3', region='', account='', # access to the bucket
+                            #         resource=outgoing_bucket.bucket_name),
+                            #     self.format_arn(service='s3', region='', account='',
+                            #         resource=outgoing_bucket.bucket_name, resource_name='*') ], # access to objects
+                            )
                     ] ) ] )
 
         delete_object_lambda = _lambda.Function(
