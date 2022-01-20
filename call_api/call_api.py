@@ -17,16 +17,16 @@ TEST_BUCKET = "uploader-incoming-test"
 
 def lambda_handler(event, context):
 
-    # for testing, copy the object to another s3 bucket
-    print(json.dumps(event))
+    if "DEBUG" in os.environ:
+        print(json.dumps(event))
+
     event_detail = event["detail"]
 
     s3 = boto3.resource("s3")
     s3_client = s3.meta.client
     event_client = boto3.client("events")
-    sqs = boto3.resource("sqs")
-    lambda_arn = context.invoked_function_arn
 
+    # for testing, copy the object to another s3 bucket
     # begin TESTING cleverness
 
     target_bucket = s3.Bucket(TEST_BUCKET)
@@ -37,7 +37,7 @@ def lambda_handler(event, context):
 
     filename = os.path.basename(s3_object.key)
     if re.search("fail", filename, re.I) and elapsed_seconds < 120:
-        # after 180 seconds, let the transfer succeed
+        # after 120 seconds, let the transfer succeed
         api_status = "failed"
     elif re.search("reject", filename, re.I):
         api_status = "rejected"
@@ -60,7 +60,7 @@ def lambda_handler(event, context):
 
     status_event = {
         "DetailType": "API Status",
-        "Source": lambda_arn,
+        "Source": context.invoked_function_arn,
         "Detail": json.dumps(detail),
     }
 

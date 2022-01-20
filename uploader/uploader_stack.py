@@ -2,6 +2,7 @@ from aws_cdk import (
     Duration,
     Stack,
     CfnParameter,
+    CfnOutput,
     region_info,
     aws_iam as iam,
     aws_logs as logs,
@@ -52,16 +53,20 @@ class UploaderStack(Stack):
             outgoing_bucket = s3.Bucket.from_bucket_name(
                 self,
                 "Outgoing",
-                existing_bucket_param,  # .value_as_string,
+                existing_bucket_param,
                 # event_bridge_enabled=True
             )
         else:
             outgoing_bucket = s3.Bucket(
                 self,
                 "Outgoing",
-                bucket_name=outgoing_bucket_param,  # .value_as_string,
-                event_bridge_enabled=True,
+                # event_bridge_enabled=True,
             )
+
+        # https://docs.aws.amazon.com/cdk/v2/guide/environments.html
+        # MyDevStack(app, "dev", env=cdk.Environment(
+        #     account=os.environ["CDK_DEFAULT_ACCOUNT"],
+        #     region=os.environ["CDK_DEFAULT_REGION"]))
 
         # standard service principals
         # this_region = Stack.of(self).region
@@ -83,29 +88,14 @@ class UploaderStack(Stack):
             "service-role/AWSLambdaBasicExecutionRole"
         )
 
-        # several roles need read access to the bucket
-        bucket_resources = [
-            # access to the bucket
-            self.format_arn(
-                service="s3",
-                region="",
-                account="",
-                resource=outgoing_bucket.bucket_name,
-            ),
-            # access to objects
-            self.format_arn(
-                service="s3",
-                region="",
-                account="",
-                resource=outgoing_bucket.bucket_name,
-                resource_name="*",
-            ),
-        ]
-
         bucket_read_policy = iam.PolicyStatement(
             actions=["s3:GetObject"],
             effect=iam.Effect.ALLOW,
-            resources=bucket_resources,
+            # resources=bucket_resources,
+            resources=[
+                outgoing_bucket.bucket_arn,
+                outgoing_bucket.arn_for_objects("*"),
+            ],
         )
 
         service_role = iam.Role(
@@ -144,6 +134,7 @@ class UploaderStack(Stack):
         # https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns-content-based-filtering.html
 
         prefix = "processed/"  # for testing
+
         put_object_rule = events.Rule(
             self,
             "S3EventPutObject",  # "OutgoingPutObject",
@@ -155,6 +146,12 @@ class UploaderStack(Stack):
             ),
             targets=[targets.LambdaFunction(new_object_received_lambda)],
         )
+
+        # outgoing_bucket.add_event_notification(
+        #     s3.EventType.OBJECT_CREATED_PUT, #OBJECT_CREATED,
+        #     # targets.LambdaFunction(new_object_received_lambda),
+        #     s3n.LambdaDestination(new_object_received_lambda), #
+        #     s3.NotificationKeyFilter(prefix=prefix, suffix=".json") )
 
         # role and function for calling the API
         service_role = iam.Role(
@@ -271,7 +268,11 @@ class UploaderStack(Stack):
                         iam.PolicyStatement(
                             actions=["s3:DeleteObject"],
                             effect=iam.Effect.ALLOW,
-                            resources=bucket_resources,
+                            # resources=bucket_resources,
+                            resources=[
+                                outgoing_bucket.bucket_arn,
+                                outgoing_bucket.arn_for_objects("*"),
+                            ],
                         )
                     ]
                 )
@@ -413,3 +414,5 @@ class UploaderStack(Stack):
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[targets.LambdaFunction(handle_retries_lambda)],
         )
+
+        CfnOutput(self, "OutgoingBucket", value=outgoing_bucket.bucket_arn)
