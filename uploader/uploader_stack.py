@@ -70,7 +70,6 @@ class UploaderStack(Stack):
         inbound_bucket_read_policy = iam.PolicyStatement(
             actions=["s3:GetObject"],
             effect=iam.Effect.ALLOW,
-            # resources=bucket_resources,
             resources=[
                 inbound_bucket.bucket_arn,
                 inbound_bucket.arn_for_objects("*"),
@@ -113,7 +112,8 @@ class UploaderStack(Stack):
         # https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns-content-based-filtering.html
 
         prefix = "processed/"  # for testing
-        # there is no syntax for matching on suffix
+        # there is no event pattern syntax for matching on suffix.
+        # would have to do this in code if necessary.
 
         put_object_rule = events.Rule(
             self,
@@ -151,25 +151,6 @@ class UploaderStack(Stack):
                                 outbound_bucket.arn_for_objects("*"),
                             ],
                         ),
-                        # iam.PolicyStatement(  # policy for testing purposes
-                        #     actions=["s3:PutObject"],
-                        #     effect=iam.Effect.ALLOW,
-                        #     resources=[
-                        #         self.format_arn(
-                        #             service="s3",
-                        #             region="",
-                        #             account="",
-                        #             resource="uploader*",
-                        #         ),
-                        #         self.format_arn(
-                        #             service="s3",
-                        #             region="",
-                        #             account="",
-                        #             resource="uploader*",
-                        #             resource_name="*",
-                        #         ),
-                        #     ],
-                        # ),
                         iam.PolicyStatement(
                             actions=["events:PutEvents"],
                             effect=iam.Effect.ALLOW,
@@ -256,7 +237,6 @@ class UploaderStack(Stack):
                         iam.PolicyStatement(
                             actions=["s3:DeleteObject"],
                             effect=iam.Effect.ALLOW,
-                            # resources=bucket_resources,
                             resources=[
                                 inbound_bucket.bucket_arn,
                                 inbound_bucket.arn_for_objects("*"),
