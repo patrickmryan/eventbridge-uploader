@@ -398,7 +398,7 @@ class UploaderStack(Stack):
         handle_retries_rule = events.Rule(
             self,
             "HandleRetriesRule",
-            enabled=False,
+            enabled=True,
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[targets.LambdaFunction(handle_retries_lambda)],
         )
