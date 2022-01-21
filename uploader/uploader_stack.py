@@ -1,7 +1,7 @@
 from aws_cdk import (
     Duration,
     Stack,
-    CfnParameter,
+    # CfnParameter,
     CfnOutput,
     region_info,
     aws_iam as iam,
@@ -24,16 +24,6 @@ class UploaderStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # outgoing_bucket_param = CfnParameter(
-        #     self,
-        #     "OutgoingBucket",
-        #     type="String",
-        #     description="Bucket for data to be submitted to the API",
-        # )
-
-        existing_bucket_param = self.node.try_get_context("ExistingBucket")
-        outgoing_bucket_param = self.node.try_get_context("OutgoingBucket")
-
         permissions_boundary_policy_param = self.node.try_get_context(
             "PermissionsBoundaryPolicy"
         )
@@ -49,19 +39,8 @@ class UploaderStack(Stack):
         if debug_param_value and debug_param_value.lower() == "true":
             debug_env["DEBUG"] = "true"
 
-        if existing_bucket_param:
-            outgoing_bucket = s3.Bucket.from_bucket_name(
-                self,
-                "Outgoing",
-                existing_bucket_param,
-                # event_bridge_enabled=True
-            )
-        else:
-            outgoing_bucket = s3.Bucket(
-                self,
-                "Outgoing",
-                # event_bridge_enabled=True,
-            )
+        inbound_bucket = s3.Bucket(self, "Inbound")
+        outbound_bucket = s3.Bucket(self, "Outbound")
 
         # https://docs.aws.amazon.com/cdk/v2/guide/environments.html
         # MyDevStack(app, "dev", env=cdk.Environment(
@@ -88,13 +67,13 @@ class UploaderStack(Stack):
             "service-role/AWSLambdaBasicExecutionRole"
         )
 
-        bucket_read_policy = iam.PolicyStatement(
+        inbound_bucket_read_policy = iam.PolicyStatement(
             actions=["s3:GetObject"],
             effect=iam.Effect.ALLOW,
             # resources=bucket_resources,
             resources=[
-                outgoing_bucket.bucket_arn,
-                outgoing_bucket.arn_for_objects("*"),
+                inbound_bucket.bucket_arn,
+                inbound_bucket.arn_for_objects("*"),
             ],
         )
 
@@ -106,7 +85,7 @@ class UploaderStack(Stack):
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
-                        bucket_read_policy,
+                        inbound_bucket_read_policy,
                         iam.PolicyStatement(
                             actions=["events:PutEvents"],
                             effect=iam.Effect.ALLOW,
@@ -134,20 +113,21 @@ class UploaderStack(Stack):
         # https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns-content-based-filtering.html
 
         prefix = "processed/"  # for testing
+        # there is no syntax for matching on suffix
 
         put_object_rule = events.Rule(
             self,
-            "S3EventPutObject",  # "OutgoingPutObject",
+            "ObjectPutInBucketRule",  # "S3EventPutObject",  # "OutgoingPutObject",
             event_pattern=events.EventPattern(
                 detail_type=["Object Created"],
                 source=["aws.s3"],
-                resources=[outgoing_bucket.bucket_arn],
+                resources=[inbound_bucket.bucket_arn],
                 detail={"object": {"key": [{"prefix": prefix}]}},
             ),
             targets=[targets.LambdaFunction(new_object_received_lambda)],
         )
 
-        # outgoing_bucket.add_event_notification(
+        # inbound_bucket.add_event_notification(
         #     s3.EventType.OBJECT_CREATED_PUT, #OBJECT_CREATED,
         #     # targets.LambdaFunction(new_object_received_lambda),
         #     s3n.LambdaDestination(new_object_received_lambda), #
@@ -162,26 +142,34 @@ class UploaderStack(Stack):
             inline_policies=[
                 iam.PolicyDocument(
                     statements=[
-                        bucket_read_policy,
-                        iam.PolicyStatement(  # policy for testing purposes
+                        inbound_bucket_read_policy,
+                        iam.PolicyStatement(
                             actions=["s3:PutObject"],
                             effect=iam.Effect.ALLOW,
                             resources=[
-                                self.format_arn(
-                                    service="s3",
-                                    region="",
-                                    account="",
-                                    resource="uploader*",
-                                ),
-                                self.format_arn(
-                                    service="s3",
-                                    region="",
-                                    account="",
-                                    resource="uploader*",
-                                    resource_name="*",
-                                ),
+                                outbound_bucket.bucket_arn,
+                                outbound_bucket.arn_for_objects("*"),
                             ],
                         ),
+                        # iam.PolicyStatement(  # policy for testing purposes
+                        #     actions=["s3:PutObject"],
+                        #     effect=iam.Effect.ALLOW,
+                        #     resources=[
+                        #         self.format_arn(
+                        #             service="s3",
+                        #             region="",
+                        #             account="",
+                        #             resource="uploader*",
+                        #         ),
+                        #         self.format_arn(
+                        #             service="s3",
+                        #             region="",
+                        #             account="",
+                        #             resource="uploader*",
+                        #             resource_name="*",
+                        #         ),
+                        #     ],
+                        # ),
                         iam.PolicyStatement(
                             actions=["events:PutEvents"],
                             effect=iam.Effect.ALLOW,
@@ -198,7 +186,7 @@ class UploaderStack(Stack):
             runtime=runtime,
             code=_lambda.Code.from_asset("call_api"),
             handler="call_api.lambda_handler",
-            environment={**debug_env},
+            environment={**debug_env, "OUTBOUND_BUCKET": outbound_bucket.bucket_name},
             timeout=Duration.seconds(60),
             role=service_role,
             log_retention=log_retention,
@@ -244,12 +232,12 @@ class UploaderStack(Stack):
 
         delete_message_rule = events.Rule(
             self,
-            "DeleteMessageRule",
+            "ApiSucceededMessageRule",
             event_pattern=events.EventPattern(
                 detail_type=["API Status"],
                 source=[call_api_lambda.function_arn],
                 detail={
-                    "Bucket": [outgoing_bucket.bucket_name],
+                    "Bucket": [inbound_bucket.bucket_name],
                     "status": ["succeeded"],
                     "message": {"queue_url": [{"exists": True}]},
                 },
@@ -270,8 +258,8 @@ class UploaderStack(Stack):
                             effect=iam.Effect.ALLOW,
                             # resources=bucket_resources,
                             resources=[
-                                outgoing_bucket.bucket_arn,
-                                outgoing_bucket.arn_for_objects("*"),
+                                inbound_bucket.bucket_arn,
+                                inbound_bucket.arn_for_objects("*"),
                             ],
                         )
                     ]
@@ -293,12 +281,12 @@ class UploaderStack(Stack):
 
         delete_object_rule = events.Rule(
             self,
-            "DeleteObjectRule",
+            "ApiSucceededObjectRule",
             event_pattern=events.EventPattern(
                 detail_type=["API Status"],
                 source=[call_api_lambda.function_arn],
                 detail={
-                    "Bucket": [outgoing_bucket.bucket_name],
+                    "Bucket": [inbound_bucket.bucket_name],
                     "status": ["succeeded"],
                 },
             ),
@@ -343,7 +331,7 @@ class UploaderStack(Stack):
                 detail_type=["API Status"],
                 source=[call_api_lambda.function_arn],
                 detail={
-                    "Bucket": [outgoing_bucket.bucket_name],
+                    "Bucket": [inbound_bucket.bucket_name],
                     "status": ["failed"],
                     # next rule ensures that a failed API call results
                     # in exactly one message being put in the Q.
@@ -399,7 +387,7 @@ class UploaderStack(Stack):
                     handle_retries_lambda.function_arn,
                 ],
                 detail={
-                    "Bucket": [outgoing_bucket.bucket_name],
+                    "Bucket": [inbound_bucket.bucket_name],
                     "status": ["ready_for_api"],
                 },
             ),
@@ -415,4 +403,5 @@ class UploaderStack(Stack):
             targets=[targets.LambdaFunction(handle_retries_lambda)],
         )
 
-        CfnOutput(self, "OutgoingBucket", value=outgoing_bucket.bucket_arn)
+        CfnOutput(self, "InboundBucket", value=inbound_bucket.bucket_name)
+        CfnOutput(self, "OutboundBucket", value=outbound_bucket.bucket_name)

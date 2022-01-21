@@ -5,8 +5,6 @@ import json
 from datetime import datetime, timezone
 import boto3
 
-TEST_BUCKET = "uploader-incoming-test"
-
 # class ApiResult():
 #     def event_detail(self, event=None):
 #         pass
@@ -29,7 +27,7 @@ def lambda_handler(event, context):
     # for testing, copy the object to another s3 bucket
     # begin TESTING cleverness
 
-    target_bucket = s3.Bucket(TEST_BUCKET)
+    target_bucket = s3.Bucket(os.environ.get("OUTBOUND_BUCKET"))
     s3_object = s3.Object(event_detail["Bucket"], event_detail["Key"])
     last_modified = datetime.fromisoformat(event_detail["LastModified"])
     now = datetime.now(timezone.utc)
