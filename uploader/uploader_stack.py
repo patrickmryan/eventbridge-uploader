@@ -3,6 +3,7 @@ from aws_cdk import (
     Stack,
     # CfnParameter,
     CfnOutput,
+    RemovalPolicy,
     region_info,
     aws_iam as iam,
     aws_logs as logs,
@@ -39,8 +40,19 @@ class UploaderStack(Stack):
         if debug_param_value and debug_param_value.lower() == "true":
             debug_env["DEBUG"] = "true"
 
-        inbound_bucket = s3.Bucket(self, "Inbound")
-        outbound_bucket = s3.Bucket(self, "Outbound")
+        inbound_bucket = s3.Bucket(
+            self,
+            "Inbound",
+            auto_delete_objects=True,
+            removal_policy=RemovalPolicy.DESTROY,
+            # event_bridge_enabled=True
+        )
+        outbound_bucket = s3.Bucket(
+            self,
+            "Outbound",
+            auto_delete_objects=True,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
 
         # https://docs.aws.amazon.com/cdk/v2/guide/environments.html
         # MyDevStack(app, "dev", env=cdk.Environment(
