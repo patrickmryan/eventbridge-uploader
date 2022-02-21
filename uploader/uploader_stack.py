@@ -1,6 +1,7 @@
 from aws_cdk import (
     Duration,
     Stack,
+    Tags,
     # CfnParameter,
     CfnOutput,
     RemovalPolicy,
@@ -25,14 +26,18 @@ class UploaderStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        permissions_boundary_policy_param = self.node.try_get_context(
-            "PermissionsBoundaryPolicy"
+        permissions_boundary_policy_arn = self.node.try_get_context(
+            "PermissionsBoundaryPolicyArn"
         )
-        if permissions_boundary_policy_param:
-            permissions_boundary = iam.ManagedPolicy.from_managed_policy_name(
-                self, "PermissionsBoundary", permissions_boundary_policy_param
+        if permissions_boundary_policy_arn:
+            policy = (
+                iam.ManagedPolicy.from_managed_policy_arn(  #   from_managed_policy_name
+                    self, "PermissionsBoundary", permissions_boundary_policy_arn
+                )
             )
-            iam.PermissionsBoundary.of(self).apply(permissions_boundary)
+            iam.PermissionsBoundary.of(self).apply(policy)
+
+        Tags.of(self).add("TESTTAG", "testvalue")
 
         # If debugging is enabled, set up a dict with an environment variable in Lambda.
         debug_env = {}
