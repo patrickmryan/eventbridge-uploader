@@ -29,6 +29,7 @@ def lambda_handler(event, context):
 
     target_bucket = s3.Bucket(os.environ.get("OUTBOUND_BUCKET"))
     source_object = s3.Object(event_detail["Bucket"], event_detail["Key"])
+
     last_modified = datetime.fromisoformat(event_detail["LastModified"])
     now = datetime.now(timezone.utc)
     elapsed_seconds = (now - last_modified).total_seconds()
@@ -45,15 +46,22 @@ def lambda_handler(event, context):
     if api_status == "succeeded":
         try:
             target_object = target_bucket.Object(f"copied/{source_object.key}")
+
+            response = s3_client.get_object_tagging(
+                Bucket=source_object.bucket_name, Key=source_object.key
+            )
+            tag_set = response["TagSet"]
+
             target_object.copy(
                 {"Bucket": source_object.bucket_name, "Key": source_object.key}
             )
+
+            tag_set.append({"Key": "ElapsedSeconds", "Value": str(elapsed_seconds)})
+
             s3_client.put_object_tagging(
                 Bucket=target_object.bucket_name,
                 Key=target_object.key,
-                Tagging={
-                    "TagSet": [{"Key": "ElapsedSeconds", "Value": str(elapsed_seconds)}]
-                },
+                Tagging={"TagSet": tag_set},
             )
 
         except s3_client.exceptions.ClientError as exc:

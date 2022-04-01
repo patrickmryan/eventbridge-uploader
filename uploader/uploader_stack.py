@@ -69,7 +69,7 @@ class UploaderStack(Stack):
         )
 
         inbound_bucket_read_policy = iam.PolicyStatement(
-            actions=["s3:GetObject"],
+            actions=["s3:GetObject", "s3:GetObjectTagging"],
             effect=iam.Effect.ALLOW,
             resources=[
                 inbound_bucket.bucket_arn,
