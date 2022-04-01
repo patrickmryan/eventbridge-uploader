@@ -59,22 +59,6 @@ class UploaderStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # https://docs.aws.amazon.com/cdk/v2/guide/environments.html
-        # MyDevStack(app, "dev", env=cdk.Environment(
-        #     account=os.environ["CDK_DEFAULT_ACCOUNT"],
-        #     region=os.environ["CDK_DEFAULT_REGION"]))
-
-        # standard service principals
-        # this_region = Stack.of(self).region
-        # region = region_info.RegionInfo.get(Stack.of(self).region)
-        # s3_principal = region.service_principal('s3.amazonaws.com')
-
-        # s3_principal     = region.service_principal(service='s3.amazonaws.com')
-        # lambda_principal = region_info.RegionInfo.service_principal(service='lambda')
-
-        # lambdas
-        # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html
-
         # setting for all python Lambda functions
         runtime = _lambda.Runtime.PYTHON_3_8
         log_retention = logs.RetentionDays.ONE_WEEK
@@ -161,7 +145,7 @@ class UploaderStack(Stack):
                     statements=[
                         inbound_bucket_read_policy,
                         iam.PolicyStatement(
-                            actions=["s3:PutObject"],
+                            actions=["s3:PutObject", "s3:PutObjectTagging"],
                             effect=iam.Effect.ALLOW,
                             resources=[
                                 outbound_bucket.bucket_arn,

@@ -28,12 +28,12 @@ def lambda_handler(event, context):
     # begin TESTING cleverness
 
     target_bucket = s3.Bucket(os.environ.get("OUTBOUND_BUCKET"))
-    s3_object = s3.Object(event_detail["Bucket"], event_detail["Key"])
+    source_object = s3.Object(event_detail["Bucket"], event_detail["Key"])
     last_modified = datetime.fromisoformat(event_detail["LastModified"])
     now = datetime.now(timezone.utc)
     elapsed_seconds = (now - last_modified).total_seconds()
 
-    filename = os.path.basename(s3_object.key)
+    filename = os.path.basename(source_object.key)
     if re.search("fail", filename, re.I) and elapsed_seconds < 120:
         # after 120 seconds, let the transfer succeed
         api_status = "failed"
@@ -44,11 +44,20 @@ def lambda_handler(event, context):
 
     if api_status == "succeeded":
         try:
-            new_object = target_bucket.Object(f"copied/{s3_object.key}")
-            new_object.copy({"Bucket": s3_object.bucket_name, "Key": s3_object.key})
+            target_object = target_bucket.Object(f"copied/{source_object.key}")
+            target_object.copy(
+                {"Bucket": source_object.bucket_name, "Key": source_object.key}
+            )
+            s3_client.put_object_tagging(
+                Bucket=target_object.bucket_name,
+                Key=target_object.key,
+                Tagging={
+                    "TagSet": [{"Key": "ElapsedSeconds", "Value": str(elapsed_seconds)}]
+                },
+            )
 
         except s3_client.exceptions.ClientError as exc:
-            print(f"error copying {s3_object} to {target_bucket} - {exc}")
+            print(f"error copying {source_object} to {target_bucket} - {exc}")
             return {"status": "failed"}
 
     # end TESTING cleverness

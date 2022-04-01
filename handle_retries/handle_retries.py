@@ -15,6 +15,7 @@ def lambda_handler(event, context):
     queue_url = os.environ.get("QUEUE_URL")
     sqs = boto3.resource("sqs")
     sqs_client = sqs.meta.client
+    # sqs_client = boto3.client('sqs')
 
     event_client = boto3.client("events")
     lambda_arn = context.invoked_function_arn
@@ -27,7 +28,6 @@ def lambda_handler(event, context):
     done = False
     # check context value for time remaining?
     while not done:
-        messages = []
         try:
             messages = retry_queue.receive_messages(
                 #             VisibilityTimeout=60,
@@ -39,7 +39,6 @@ def lambda_handler(event, context):
             break
 
         if not messages:
-            # if there are no more messages, finish and let the function exit
             done = True
             continue
 
@@ -84,3 +83,6 @@ if __name__ == "__main__":
     #     event = json.load(fp)
 
     lambda_handler(event=event, context={})
+
+    # "invoked_function_arn":
+    #     "arn:aws:lambda:us-east-1:458358814065:function:UploaderStack-HandleRetriesCC180680-4dxbnXpWEBRc"
