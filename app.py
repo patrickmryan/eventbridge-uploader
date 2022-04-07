@@ -8,6 +8,10 @@ import aws_cdk as cdk
 
 from uploader.uploader_stack import UploaderStack
 
+env = cdk.Environment(
+    account=os.getenv("CDK_DEFAULT_ACCOUNT"), region=os.getenv("CDK_DEFAULT_REGION")
+)
+
 app = cdk.App()
-stack = UploaderStack(app, "UploaderStack")
+stack = UploaderStack(app, "UploaderStack", env=env)
 app.synth()
