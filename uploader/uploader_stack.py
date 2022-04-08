@@ -37,7 +37,7 @@ class UploaderStack(Stack):
             )
             iam.PermissionsBoundary.of(self).apply(policy)
 
-        Tags.of(self).add("TESTTAG", "testvalue")
+        # Tags.of(self).add("TESTTAG", "testvalue")
 
         # If debugging is enabled, set up a dict with an environment variable in Lambda.
         debug_env = {}
@@ -50,7 +50,7 @@ class UploaderStack(Stack):
             "Inbound",
             auto_delete_objects=True,
             removal_policy=RemovalPolicy.DESTROY,
-            # event_bridge_enabled=True
+            event_bridge_enabled=True,
         )
         outbound_bucket = s3.Bucket(
             self,
