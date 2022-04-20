@@ -16,7 +16,7 @@
   },
   "context": {
     "EnableDebug": "True",
-    "PermissionsBoundaryPolicyArn": "",
+    "PermissionsBoundaryPolicyArn": "arn:aws:iam::458358814065:policy/T_PROJADMIN_U",
     "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
     "@aws-cdk/core:stackRelativeExports": true,
     "@aws-cdk/aws-rds:lowercaseDbIdentifier": true,

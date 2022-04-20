@@ -4,14 +4,10 @@ from aws_cdk import (
     Tags,
     CfnOutput,
     RemovalPolicy,
-    region_info,
     aws_iam as iam,
     aws_logs as logs,
     aws_sqs as sqs,
     aws_s3 as s3,
-    aws_s3_notifications as s3n,
-    aws_sns as sns,
-    aws_sns_subscriptions as subscriptions,
     aws_lambda as _lambda,
     aws_events as events,
     aws_events_targets as targets,
@@ -35,7 +31,7 @@ class UploaderStack(Stack):
             )
             iam.PermissionsBoundary.of(self).apply(policy)
 
-        # Tags.of(self).add("TESTTAG", "testvalue")
+        Tags.of(self).add("TESTTAG", "testvalue")
 
         # If debugging is enabled, set up a dict with an environment variable in Lambda.
         debug_env = {}
@@ -125,12 +121,6 @@ class UploaderStack(Stack):
             ),
             targets=[targets.LambdaFunction(new_object_received_lambda)],
         )
-
-        # inbound_bucket.add_event_notification(
-        #     s3.EventType.OBJECT_CREATED_PUT, #OBJECT_CREATED,
-        #     # targets.LambdaFunction(new_object_received_lambda),
-        #     s3n.LambdaDestination(new_object_received_lambda), #
-        #     s3.NotificationKeyFilter(prefix=prefix, suffix=".json") )
 
         # role and function for calling the API
         service_role = iam.Role(
