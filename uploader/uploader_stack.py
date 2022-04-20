@@ -2,7 +2,6 @@ from aws_cdk import (
     Duration,
     Stack,
     Tags,
-    # CfnParameter,
     CfnOutput,
     RemovalPolicy,
     region_info,
@@ -18,7 +17,6 @@ from aws_cdk import (
     aws_events_targets as targets,
 )
 
-# from aws_cdk.region_info import RegionInfo
 from constructs import Construct
 
 
