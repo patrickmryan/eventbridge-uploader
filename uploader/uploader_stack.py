@@ -78,6 +78,7 @@ class UploaderStack(Stack):
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
+                    assign_sids=True,
                     statements=[
                         inbound_bucket_read_policy,
                         iam.PolicyStatement(
@@ -85,7 +86,7 @@ class UploaderStack(Stack):
                             effect=iam.Effect.ALLOW,
                             resources=[event_bus.event_bus_arn],
                         ),
-                    ]
+                    ],
                 )
             ],
         )
@@ -107,12 +108,11 @@ class UploaderStack(Stack):
         # https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns-content-based-filtering.html
 
         prefix = "processed/"  # for testing
-        # there is no event pattern syntax for matching on suffix.
-        # would have to do this in code if necessary.
+        # there is no event pattern syntax for matching on suffix. would have to do this in code if necessary.
 
         put_object_rule = events.Rule(
             self,
-            "ObjectPutInBucketRule",  # "S3EventPutObject",  # "OutgoingPutObject",
+            "ObjectPutInBucketRule",
             event_pattern=events.EventPattern(
                 detail_type=["Object Created"],
                 source=["aws.s3"],
@@ -130,6 +130,7 @@ class UploaderStack(Stack):
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
+                    assign_sids=True,
                     statements=[
                         inbound_bucket_read_policy,
                         iam.PolicyStatement(
@@ -145,7 +146,7 @@ class UploaderStack(Stack):
                             effect=iam.Effect.ALLOW,
                             resources=[event_bus.event_bus_arn],
                         ),
-                    ]
+                    ],
                 )
             ],
         )
@@ -177,13 +178,14 @@ class UploaderStack(Stack):
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
+                    assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
                             actions=["sqs:DeleteMessage"],
                             effect=iam.Effect.ALLOW,
                             resources=[retry_queue.queue_arn],
                         )
-                    ]
+                    ],
                 )
             ],
         )
@@ -222,6 +224,7 @@ class UploaderStack(Stack):
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
+                    assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
                             actions=["s3:DeleteObject"],
@@ -231,7 +234,7 @@ class UploaderStack(Stack):
                                 inbound_bucket.arn_for_objects("*"),
                             ],
                         )
-                    ]
+                    ],
                 )
             ],
         )
@@ -270,13 +273,14 @@ class UploaderStack(Stack):
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
+                    assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
                             actions=["sqs:SendMessage"],
                             effect=iam.Effect.ALLOW,
                             resources=[retry_queue.queue_arn],
                         )
-                    ]
+                    ],
                 )
             ],
         )
@@ -318,6 +322,7 @@ class UploaderStack(Stack):
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
+                    assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
                             actions=["sqs:ReceiveMessage"],
@@ -329,7 +334,7 @@ class UploaderStack(Stack):
                             effect=iam.Effect.ALLOW,
                             resources=[event_bus.event_bus_arn],
                         ),
-                    ]
+                    ],
                 )
             ],
         )
@@ -371,6 +376,13 @@ class UploaderStack(Stack):
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[targets.LambdaFunction(handle_retries_lambda)],
         )
+
+        # addToResourcePolicy()?
+        inbound_bucket.grant_read(call_api_lambda.role)
+        inbound_bucket.grant_read(new_object_received_lambda.role)
+        inbound_bucket.grant_delete(delete_object_lambda.role)
+        outbound_bucket.grant_put(call_api_lambda.role)
+        # need explicit deny for none-of-the-above
 
         CfnOutput(self, "InboundBucket", value=inbound_bucket.bucket_name)
         CfnOutput(self, "OutboundBucket", value=outbound_bucket.bucket_name)
