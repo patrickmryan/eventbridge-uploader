@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_sqs as sqs,
     aws_s3 as s3,
+    aws_kms as kms,
     aws_lambda as _lambda,
     aws_events as events,
     aws_events_targets as targets,
@@ -39,18 +40,33 @@ class UploaderStack(Stack):
         if debug_param_value and debug_param_value.lower() == "true":
             debug_env["DEBUG"] = "true"
 
+        # if a KMS key name is provided, enable bucket encryption
+        kms_key_alias = self.node.try_get_context("KmsKeyAlias")
+        if kms_key_alias:
+            kms_params = {
+                "encryption": s3.BucketEncryption.KMS,
+                "bucket_key_enabled": True,
+                "encryption_key": kms.Key.from_lookup(
+                    self, "KmsS3Key", alias_name=kms_key_alias
+                ),
+            }
+        else:
+            kms_params = {}
+
         inbound_bucket = s3.Bucket(
             self,
             "Inbound",
             auto_delete_objects=True,
             removal_policy=RemovalPolicy.DESTROY,
             event_bridge_enabled=True,
+            **kms_params
         )
         outbound_bucket = s3.Bucket(
             self,
             "Outbound",
             auto_delete_objects=True,
             removal_policy=RemovalPolicy.DESTROY,
+            **kms_params
         )
 
         # setting for all python Lambda functions
