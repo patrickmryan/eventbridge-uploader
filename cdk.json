@@ -16,7 +16,7 @@
   },
   "context": {
     "EnableDebug": "True",
-    "PermissionsBoundaryPolicyArn": "arn:aws:iam::458358814065:policy/T_PROJADMIN_U",
+    "PermissionsBoundaryPolicyArn": "arn:aws:iam::aws:policy/AdministratorAccess",
     "KmsKeyAlias": "alias/aws/s3"
   }
 }
