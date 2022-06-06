@@ -128,7 +128,7 @@ class UploaderStack(Stack):
 
         put_object_rule = events.Rule(
             self,
-            "ObjectPutInBucketRule",
+            "NewObjectInBucketRule",
             event_pattern=events.EventPattern(
                 detail_type=["Object Created"],
                 source=["aws.s3"],
