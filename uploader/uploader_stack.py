@@ -72,13 +72,14 @@ class UploaderStack(Stack):
         # setting for all python Lambda functions
         runtime = _lambda.Runtime.PYTHON_3_8
         log_retention = logs.RetentionDays.ONE_WEEK
+        lambda_principal = iam.ServicePrincipal("lambda.amazonaws.com")
 
         event_bus = events.EventBus.from_event_bus_name(self, "EventBus", "default")
         basic_lambda_policy = iam.ManagedPolicy.from_aws_managed_policy_name(
             "service-role/AWSLambdaBasicExecutionRole"
         )
 
-        inbound_bucket_read_policy = iam.PolicyStatement(
+        allow_read_inbound_bucket_read = iam.PolicyStatement(
             actions=["s3:GetObject", "s3:GetObjectTagging"],
             effect=iam.Effect.ALLOW,
             resources=[
@@ -90,13 +91,13 @@ class UploaderStack(Stack):
         service_role = iam.Role(
             self,
             "NewObjectReceivedRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
-                        inbound_bucket_read_policy,
+                        allow_read_inbound_bucket_read,
                         iam.PolicyStatement(
                             actions=["events:PutEvents"],
                             effect=iam.Effect.ALLOW,
@@ -126,6 +127,8 @@ class UploaderStack(Stack):
         prefix = "processed/"  # for testing
         # there is no event pattern syntax for matching on suffix. would have to do this in code if necessary.
 
+        detail_type = "API Status"
+
         put_object_rule = events.Rule(
             self,
             "NewObjectInBucketRule",
@@ -142,13 +145,13 @@ class UploaderStack(Stack):
         service_role = iam.Role(
             self,
             "CallApiRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
-                        inbound_bucket_read_policy,
+                        allow_read_inbound_bucket_read,
                         iam.PolicyStatement(
                             actions=["s3:PutObject", "s3:PutObjectTagging"],
                             effect=iam.Effect.ALLOW,
@@ -190,7 +193,7 @@ class UploaderStack(Stack):
         service_role = iam.Role(
             self,
             "DeleteMessageRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
@@ -222,7 +225,7 @@ class UploaderStack(Stack):
             self,
             "ApiSucceededMessageRule",
             event_pattern=events.EventPattern(
-                detail_type=["API Status"],
+                detail_type=[detail_type],
                 source=[call_api_lambda.function_arn],
                 detail={
                     "Bucket": [inbound_bucket.bucket_name],
@@ -236,7 +239,7 @@ class UploaderStack(Stack):
         service_role = iam.Role(
             self,
             "DeleteObjectRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
@@ -271,7 +274,7 @@ class UploaderStack(Stack):
             self,
             "ApiSucceededObjectRule",
             event_pattern=events.EventPattern(
-                detail_type=["API Status"],
+                detail_type=[detail_type],
                 source=[call_api_lambda.function_arn],
                 detail={
                     "Bucket": [inbound_bucket.bucket_name],
@@ -285,7 +288,7 @@ class UploaderStack(Stack):
         service_role = iam.Role(
             self,
             "SendToRetryQueueRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
@@ -317,7 +320,7 @@ class UploaderStack(Stack):
             self,
             "ApiFailedRule",
             event_pattern=events.EventPattern(
-                detail_type=["API Status"],
+                detail_type=[detail_type],
                 source=[call_api_lambda.function_arn],
                 detail={
                     "Bucket": [inbound_bucket.bucket_name],
@@ -334,7 +337,7 @@ class UploaderStack(Stack):
         service_role = iam.Role(
             self,
             "HandleRetriesRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
             inline_policies=[
                 iam.PolicyDocument(
@@ -371,7 +374,7 @@ class UploaderStack(Stack):
             self,
             "ReadyForApiRule",
             event_pattern=events.EventPattern(
-                detail_type=["API Status"],
+                detail_type=[detail_type],
                 source=[
                     new_object_received_lambda.function_arn,
                     handle_retries_lambda.function_arn,
