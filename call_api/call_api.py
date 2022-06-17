@@ -47,6 +47,16 @@ def lambda_handler(event, context):
         try:
             target_object = target_bucket.Object(f"copied/{source_object.key}")
 
+            target_object.copy_from(
+                CopySource={
+                    "Bucket": source_object.bucket_name,
+                    "Key": source_object.key,
+                },
+                TaggingDirective="COPY",
+            )
+
+            # need to add ElapsedSeconds tag
+
             response = s3_client.get_object_tagging(
                 Bucket=source_object.bucket_name, Key=source_object.key
             )
