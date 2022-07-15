@@ -1,5 +1,8 @@
 {
   "key-provider:account=286367598331:aliasName=alias/aws/s3:region=us-east-1": {
     "keyId": "9c9c08ba-a586-46f5-8729-f8396d19e198"
+  },
+  "key-provider:account=008690417405:aliasName=alias/aws/s3:region=us-east-1": {
+    "keyId": "5645e138-0ec7-4db6-bc6c-7e1e9f3ae145"
   }
 }

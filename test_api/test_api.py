@@ -18,7 +18,11 @@ def lambda_handler(event, context):
     if "DEBUG" in os.environ:
         print(json.dumps(event))
 
-    return {"returnCode": 200}
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "text/plain"},
+        "body": "Hello, CDK! You have hit {}\n".format(event["path"]),
+    }
 
     # event_detail = event["detail"]
 

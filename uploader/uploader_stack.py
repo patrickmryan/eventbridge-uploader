@@ -188,21 +188,40 @@ class UploaderStack(Stack):
 
         # add API gw
 
-        test_api = apigw.RestApi(
-            self,
-            "RestApi",
-            endpoint_configuration=apigw.EndpointConfiguration(
-                types=[apigw.EndpointType.PRIVATE]
-            ),  # EDGE
-            deploy=True,
-        )
+        test_api = apigw.LambdaRestApi(self, "RestApi", handler=test_api_lambda)
+
+        # test_api = apigw.RestApi(
+        #     self,
+        #     "RestApi",
+        #     endpoint_configuration=apigw.EndpointConfiguration(
+        #         types=[apigw.EndpointType.PRIVATE]
+        #     ),  # EDGE
+        #     # default_integration=apigw.LambdaIntegration(
+        #     #     # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_apigateway/LambdaIntegration.html
+        #     #     test_api_lambda,
+        #     #     # content_handling
+        #     #     # request_parameters
+        #     #     # vpc_link
+        #     # ),
+        #     deploy=True,
+        # )
+
+        # test_api.root.add_method("POST",
+        #     apigw.LambdaIntegration(
+        #         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_apigateway/LambdaIntegration.html
+        #         test_api_lambda,
+        #         # content_handling
+        #         # request_parameters
+        #         # vpc_link
+        #     ),
+        # )
 
         # . maybe. might be automagic.
-        test_api_lambda.add_permission(
-            "ApiGwCallTestApi",
-            principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
-            # source_arn=test_api.arn
-        )
+        # test_api_lambda.add_permission(
+        #     "ApiGwCallTestApi",
+        #     principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
+        #     # source_arn=test_api.arn
+        # )
 
         # role and function for calling the API
         service_role = iam.Role(
@@ -468,3 +487,4 @@ class UploaderStack(Stack):
 
         CfnOutput(self, "InboundBucket", value=inbound_bucket.bucket_name)
         CfnOutput(self, "OutboundBucket", value=outbound_bucket.bucket_name)
+        # CfnOutput(self, "ApiUrl", value=test_api.url)
