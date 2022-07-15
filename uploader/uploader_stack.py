@@ -183,12 +183,11 @@ class UploaderStack(Stack):
             log_retention=log_retention,
         )
 
-        # actions=["s3:PutObject", "s3:PutObjectTagging"]
-        # test_api_lambda.add_permission(action="s3:PutObject", )
-
         # add API gw
-
         test_api = apigw.LambdaRestApi(self, "RestApi", handler=test_api_lambda)
+
+        items = test_api.root.add_resource("submit")
+        items.add_method("POST", apigw.LambdaIntegration(test_api_lambda))
 
         # test_api = apigw.RestApi(
         #     self,
@@ -487,4 +486,3 @@ class UploaderStack(Stack):
 
         CfnOutput(self, "InboundBucket", value=inbound_bucket.bucket_name)
         CfnOutput(self, "OutboundBucket", value=outbound_bucket.bucket_name)
-        # CfnOutput(self, "ApiUrl", value=test_api.url)
