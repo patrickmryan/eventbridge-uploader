@@ -18,10 +18,16 @@ def lambda_handler(event, context):
     if "DEBUG" in os.environ:
         print(json.dumps(event))
 
+    qsp = event.get("queryStringParameters", {})
+    body = event.get("body", "")
+
+    details = {**qsp, **{"body": body}}
+
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "text/plain"},
         "body": "Hello, CDK! You have hit {}\n".format(event["path"]),
+        # **details,
     }
 
     # event_detail = event["detail"]

@@ -94,8 +94,8 @@ class UploaderStack(Stack):
             "NewObjectReceivedRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "events": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         allow_read_inbound_bucket_read,
@@ -106,7 +106,7 @@ class UploaderStack(Stack):
                         ),
                     ],
                 )
-            ],
+            },
         )
 
         new_object_received_lambda = _lambda.Function(
@@ -148,8 +148,8 @@ class UploaderStack(Stack):
             "TestApiRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "inlineTestApiRole": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         allow_read_inbound_bucket_read,
@@ -168,7 +168,7 @@ class UploaderStack(Stack):
                         ),
                     ],
                 )
-            ],
+            },
         )
 
         test_api_lambda = _lambda.Function(
@@ -228,8 +228,8 @@ class UploaderStack(Stack):
             "CallApiRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "inlineCallApiRole": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         allow_read_inbound_bucket_read,
@@ -248,7 +248,7 @@ class UploaderStack(Stack):
                         ),
                     ],
                 )
-            ],
+            },
         )
 
         call_api_lambda = _lambda.Function(
@@ -276,8 +276,8 @@ class UploaderStack(Stack):
             "DeleteMessageRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "inlineDeleteMessageRole": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
@@ -287,7 +287,7 @@ class UploaderStack(Stack):
                         )
                     ],
                 )
-            ],
+            },
         )
 
         delete_message_lambda = _lambda.Function(
@@ -322,8 +322,8 @@ class UploaderStack(Stack):
             "DeleteObjectRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "inlineDeleteObjectRole": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
@@ -336,7 +336,7 @@ class UploaderStack(Stack):
                         )
                     ],
                 )
-            ],
+            },
         )
 
         delete_object_lambda = _lambda.Function(
@@ -371,8 +371,8 @@ class UploaderStack(Stack):
             "SendToRetryQueueRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "inlineSendToRetryQueueRole": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
@@ -382,7 +382,7 @@ class UploaderStack(Stack):
                         )
                     ],
                 )
-            ],
+            },
         )
 
         send_to_retry_queue_lambda = _lambda.Function(
@@ -420,8 +420,8 @@ class UploaderStack(Stack):
             "HandleRetriesRole",
             assumed_by=lambda_principal,
             managed_policies=[basic_lambda_policy],
-            inline_policies=[
-                iam.PolicyDocument(
+            inline_policies={
+                "inlineHandleRetriesRole": iam.PolicyDocument(
                     assign_sids=True,
                     statements=[
                         iam.PolicyStatement(
@@ -436,7 +436,7 @@ class UploaderStack(Stack):
                         ),
                     ],
                 )
-            ],
+            },
         )
 
         handle_retries_lambda = _lambda.Function(
