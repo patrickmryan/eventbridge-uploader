@@ -26,8 +26,15 @@ def lambda_handler(event, context):
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "text/plain"},
-        "body": "Hello, CDK! You have hit {}\n".format(event["path"]),
-        # **details,
+        # "body": {
+        #     **details,
+        #     "message": Hello, CDK! You have hit {}\n".format(event["path"])
+        # },
+        "body": "Hello, CDK! You have hit "
+        + event["path"]
+        + "\nDetails = "
+        + json.dumps(details)
+        + "\n",
     }
 
     # event_detail = event["detail"]
