@@ -80,6 +80,8 @@ class UploaderStack(Stack):
             "service-role/AWSLambdaBasicExecutionRole"
         )
 
+        managed_policies = [basic_lambda_policy]
+
         allow_read_inbound_bucket_read = iam.PolicyStatement(
             actions=["s3:GetObject", "s3:GetObjectTagging"],
             effect=iam.Effect.ALLOW,
@@ -93,7 +95,7 @@ class UploaderStack(Stack):
             self,
             "NewObjectReceivedRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "events": iam.PolicyDocument(
                     assign_sids=True,
@@ -147,7 +149,7 @@ class UploaderStack(Stack):
             self,
             "TestApiRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "inlineTestApiRole": iam.PolicyDocument(
                     assign_sids=True,
@@ -227,7 +229,7 @@ class UploaderStack(Stack):
             self,
             "CallApiRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "inlineCallApiRole": iam.PolicyDocument(
                     assign_sids=True,
@@ -275,7 +277,7 @@ class UploaderStack(Stack):
             self,
             "DeleteMessageRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "inlineDeleteMessageRole": iam.PolicyDocument(
                     assign_sids=True,
@@ -321,7 +323,7 @@ class UploaderStack(Stack):
             self,
             "DeleteObjectRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "inlineDeleteObjectRole": iam.PolicyDocument(
                     assign_sids=True,
@@ -370,7 +372,7 @@ class UploaderStack(Stack):
             self,
             "SendToRetryQueueRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "inlineSendToRetryQueueRole": iam.PolicyDocument(
                     assign_sids=True,
@@ -419,7 +421,7 @@ class UploaderStack(Stack):
             self,
             "HandleRetriesRole",
             assumed_by=lambda_principal,
-            managed_policies=[basic_lambda_policy],
+            managed_policies=managed_policies,
             inline_policies={
                 "inlineHandleRetriesRole": iam.PolicyDocument(
                     assign_sids=True,

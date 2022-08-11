@@ -19,23 +19,34 @@ def lambda_handler(event, context):
         print(json.dumps(event))
 
     qsp = event.get("queryStringParameters", {})
+    if not qsp:
+        qsp = {}
     body = event.get("body", "")
+    if not body:
+        body = ""
+    headers = event.get("headers", {})
 
-    details = {**qsp, **{"body": body}}
+    details = {
+        **qsp,
+        **{"body": body},
+        **headers,
+    }
+    if body:
+        details["body"] = body
 
-    return {
+    return_dict = {
         "statusCode": 200,
         "headers": {"Content-Type": "text/plain"},
-        # "body": {
-        #     **details,
-        #     "message": Hello, CDK! You have hit {}\n".format(event["path"])
-        # },
         "body": "Hello, CDK! You have hit "
         + event["path"]
         + "\nDetails = "
         + json.dumps(details)
         + "\n",
     }
+
+    print(json.dumps(return_dict))
+
+    return return_dict
 
     # event_detail = event["detail"]
 
