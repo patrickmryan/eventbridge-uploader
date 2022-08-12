@@ -25,11 +25,24 @@ class UploaderStack(Stack):
         permissions_boundary_policy_arn = self.node.try_get_context(
             "PermissionsBoundaryPolicyArn"
         )
-        if permissions_boundary_policy_arn:
-            policy = (
-                iam.ManagedPolicy.from_managed_policy_arn(  #   from_managed_policy_name
-                    self, "PermissionsBoundary", permissions_boundary_policy_arn
+
+        if not permissions_boundary_policy_arn:
+            permissions_boundary_policy_name = self.node.try_get_context(
+                "PermissionsBoundaryPolicyName"
+            )
+            if permissions_boundary_policy_name:
+                permissions_boundary_policy_arn = self.format_arn(
+                    service="iam",
+                    region="",
+                    account=self.account,
+                    resource="policy",
+                    resource_name=permissions_boundary_policy_name,
                 )
+                print(permissions_boundary_policy_arn)
+
+        if permissions_boundary_policy_arn:
+            policy = iam.ManagedPolicy.from_managed_policy_arn(
+                self, "PermissionsBoundary", permissions_boundary_policy_arn
             )
             iam.PermissionsBoundary.of(self).apply(policy)
 
