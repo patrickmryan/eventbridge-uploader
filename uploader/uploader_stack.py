@@ -1,3 +1,4 @@
+import os
 from aws_cdk import (
     Duration,
     Stack,
@@ -47,6 +48,8 @@ class UploaderStack(Stack):
             iam.PermissionsBoundary.of(self).apply(policy)
 
         Tags.of(self).add("TESTTAG", "testvalue")
+
+        lambda_root = "lambda"  # maybe context variable
 
         # If debugging is enabled, set up a dict with an environment variable in Lambda.
         debug_env = {}
@@ -128,7 +131,9 @@ class UploaderStack(Stack):
             self,
             "NewObjectReceived",
             runtime=runtime,
-            code=_lambda.Code.from_asset("new_object_received"),
+            code=_lambda.Code.from_asset(
+                os.path.join(lambda_root, "new_object_received")
+            ),
             handler="new_object_received.lambda_handler",
             environment={**debug_env},
             timeout=Duration.seconds(60),
@@ -190,7 +195,7 @@ class UploaderStack(Stack):
             self,
             "TestApi",
             runtime=runtime,
-            code=_lambda.Code.from_asset("test_api"),
+            code=_lambda.Code.from_asset(os.path.join(lambda_root, "test_api")),
             handler="test_api.lambda_handler",
             environment={**debug_env, "OUTBOUND_BUCKET": outbound_bucket.bucket_name},
             timeout=Duration.seconds(60),
@@ -270,7 +275,7 @@ class UploaderStack(Stack):
             self,
             "CallApi",
             runtime=runtime,
-            code=_lambda.Code.from_asset("call_api"),
+            code=_lambda.Code.from_asset(os.path.join(lambda_root, "call_api")),
             handler="call_api.lambda_handler",
             environment={**debug_env, "OUTBOUND_BUCKET": outbound_bucket.bucket_name},
             timeout=Duration.seconds(60),
@@ -309,7 +314,7 @@ class UploaderStack(Stack):
             self,
             "DeleteMessage",
             runtime=runtime,
-            code=_lambda.Code.from_asset("delete_message"),
+            code=_lambda.Code.from_asset(os.path.join(lambda_root, "delete_message")),
             handler="delete_message.lambda_handler",
             environment={**debug_env},
             timeout=Duration.seconds(60),
@@ -358,7 +363,7 @@ class UploaderStack(Stack):
             self,
             "DeleteObject",
             runtime=runtime,
-            code=_lambda.Code.from_asset("delete_object"),
+            code=_lambda.Code.from_asset(os.path.join(lambda_root, "delete_object")),
             handler="delete_object.lambda_handler",
             environment={**debug_env},
             timeout=Duration.seconds(60),
@@ -404,7 +409,9 @@ class UploaderStack(Stack):
             self,
             "SendToRetryQueue",
             runtime=runtime,
-            code=_lambda.Code.from_asset("send_to_retry_queue"),
+            code=_lambda.Code.from_asset(
+                os.path.join(lambda_root, "send_to_retry_queue")
+            ),
             handler="send_to_retry_queue.lambda_handler",
             environment={**debug_env, "QUEUE_URL": retry_queue.queue_url},
             timeout=Duration.seconds(60),
@@ -458,7 +465,7 @@ class UploaderStack(Stack):
             self,
             "HandleRetries",
             runtime=runtime,
-            code=_lambda.Code.from_asset("handle_retries"),
+            code=_lambda.Code.from_asset(os.path.join(lambda_root, "handle_retries")),
             handler="handle_retries.lambda_handler",
             environment={**debug_env, "QUEUE_URL": retry_queue.queue_url},
             timeout=Duration.seconds(60),
