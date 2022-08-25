@@ -9,26 +9,37 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
-import os
+from os import walk
+from os.path import join, abspath
 import sys
 
-sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, abspath("."))
 # sys.path.insert(0, '/Users/pmryan/ec/projects/galactica/sphinx_basics')
 
-root = os.path.abspath("../../lambda")
-modules = [
-    "delete_object",
-    "api_rejected",
-    "new_object_received",
-    "call_api",
-    "api_succeeded",
-    "handle_retries",
-    "test_api",
-]
+root = abspath("../../lambda")
+# modules = [
+#     "delete_object",
+#     "api_rejected",
+#     "new_object_received",
+#     "call_api",
+#     "api_succeeded",
+#     "handle_retries",
+#     "test_api",
+# ]
+source_dirs = []
+for (dirpath, dirnames, filenames) in walk(root):
 
-sys.path.extend([os.path.join(root, dir) for dir in modules])
+    if not dirnames:
+        continue
+        # print(f'dirnames = {dirnames}')
+    # for dir in dirnames:
+    # 	print(join(dirpath, dir))
+    source_dirs.extend([join(dirpath, dir) for dir in dirnames])
+
+sys.path.extend(source_dirs)
 for dir in sys.path:
     print(dir)
+
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
