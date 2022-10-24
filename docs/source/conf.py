@@ -14,18 +14,9 @@ from os.path import join, abspath
 import sys
 
 sys.path.insert(0, abspath("."))
-# sys.path.insert(0, '/Users/pmryan/ec/projects/galactica/sphinx_basics')
 
 root = abspath("../../lambda")
-# modules = [
-#     "delete_object",
-#     "api_rejected",
-#     "new_object_received",
-#     "call_api",
-#     "api_succeeded",
-#     "handle_retries",
-#     "test_api",
-# ]
+
 source_dirs = []
 for (dirpath, dirnames, filenames) in walk(root):
 

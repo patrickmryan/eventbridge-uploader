@@ -10,7 +10,7 @@ Welcome to Uploader's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   modules
+   lambda
 
 
 Indices and tables

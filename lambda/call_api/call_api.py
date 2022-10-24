@@ -1,19 +1,29 @@
+"""
+Super important info about call_api.py
+"""
+
+
 import os
 import os.path
+
+
 import re
 import json
 from datetime import datetime, timezone
 import boto3
 
-# class ApiResult():
-#     def event_detail(self, event=None):
-#         pass
-#
-# class Succeeded(ApiResult):
-#     pass
-
 
 def lambda_handler(event, context):
+
+    """This method is the lambda event handler
+
+    :param int num1: The first number
+    :param int num2: The second number
+
+    :returns: The answer
+
+    :rtype: int
+    """
 
     if "DEBUG" in os.environ:
         print(json.dumps(event))
