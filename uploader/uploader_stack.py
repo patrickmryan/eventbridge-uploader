@@ -58,17 +58,28 @@ class UploaderStack(Stack):
             debug_env["DEBUG"] = "true"
 
         # if a KMS key name is provided, enable bucket encryption
-        kms_key_alias = self.node.try_get_context("KmsKeyAlias")
-        if kms_key_alias:
-            kms_params = {
+        s3_kms_key_alias = self.node.try_get_context("S3KmsKeyAlias")
+        if s3_kms_key_alias:
+            s3_kms_params = {
                 "encryption": s3.BucketEncryption.KMS,
                 "bucket_key_enabled": True,
                 "encryption_key": kms.Key.from_lookup(
-                    self, "KmsS3Key", alias_name=kms_key_alias
+                    self, "S3KmsKey", alias_name=s3_kms_key_alias
                 ),
             }
         else:
-            kms_params = {}
+            s3_kms_params = {}
+
+        sqs_kms_key_alias = self.node.try_get_context("SqsKmsKeyAlias")
+        if sqs_kms_key_alias:
+            sqs_kms_params = {
+                "encryption": sqs.QueueEncryption.KMS,
+                "encryption_master_key": kms.Key.from_lookup(
+                    self, "SqsKmsKey", alias_name=sqs_kms_key_alias
+                ),
+            }
+        else:
+            sqs_kms_params = {}
 
         inbound_bucket = s3.Bucket(
             self,
@@ -76,14 +87,14 @@ class UploaderStack(Stack):
             auto_delete_objects=True,
             removal_policy=RemovalPolicy.DESTROY,
             event_bridge_enabled=True,
-            **kms_params
+            **s3_kms_params,
         )
         outbound_bucket = s3.Bucket(
             self,
             "Outbound",
             auto_delete_objects=True,
             removal_policy=RemovalPolicy.DESTROY,
-            **kms_params
+            **s3_kms_params,
         )
 
         # setting for all python Lambda functions
@@ -283,12 +294,25 @@ class UploaderStack(Stack):
             log_retention=log_retention,
         )
 
+        dead_letter_queue = sqs.Queue(
+            self,
+            "DeadLetterOffice",
+            # retention_period=Duration.days(2),
+            # visibility_timeout=Duration.seconds(60),
+            # **sqs_kms_params,
+        )
+
         # create a Q for retrying failed calls
         retry_queue = sqs.Queue(
             self,
             "RetryQueue",
             retention_period=Duration.days(2),
             visibility_timeout=Duration.seconds(60),
+            dead_letter_queue=sqs.DeadLetterQueue(
+                max_receive_count=4, queue=dead_letter_queue
+            ),
+            enforce_ssl=True,
+            **sqs_kms_params,
         )
 
         service_role = iam.Role(

@@ -17,6 +17,6 @@
   "context": {
     "EnableDebug": "True",
     "PermissionsBoundaryPolicyArn": "",
-    "KmsKeyAlias": "alias/aws/s3"
+    "S3KmsKeyAlias": "alias/aws/s3"
   }
 }
